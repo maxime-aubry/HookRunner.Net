@@ -16,7 +16,7 @@ public static class AuditGate
             throw new InvalidDataException("NuGet reported audit problems: " + problems);
         }
 
-        var blocking = new List<string>();
+        List<string> blocking = [];
         foreach (JsonElement project in report.GetProperty("projects").EnumerateArray())
         {
             // NuGet omits frameworks entirely when the project has no findings.

@@ -10,9 +10,9 @@ public static class CoverageGate
     public static Dictionary<string, HashSet<string>> ReadSequencePoints(string pdbPath)
     {
         using FileStream stream = File.OpenRead(pdbPath);
-        using var provider = MetadataReaderProvider.FromPortablePdbStream(stream);
+        using MetadataReaderProvider provider = MetadataReaderProvider.FromPortablePdbStream(stream);
         MetadataReader reader = provider.GetMetadataReader();
-        var lines = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        Dictionary<string, HashSet<string>> lines = [with(StringComparer.Ordinal)];
         foreach (MethodDebugInformationHandle method in reader.MethodDebugInformation)
         {
             foreach (SequencePoint point in reader.GetMethodDebugInformation(method).GetSequencePoints())
@@ -48,8 +48,8 @@ public static class CoverageGate
             return new(assembly, "not-applicable", [], []);
         }
 
-        var lines = new Dictionary<string, bool>(StringComparer.Ordinal);
-        var branches = new Dictionary<string, bool>(StringComparer.Ordinal);
+        Dictionary<string, bool> lines = [with(StringComparer.Ordinal)];
+        Dictionary<string, bool> branches = [with(StringComparer.Ordinal)];
         bool found = false;
         foreach (JsonElement report in reports)
         {

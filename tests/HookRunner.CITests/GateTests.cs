@@ -76,7 +76,7 @@ public sealed class GateTests
     [InlineData("Low", "topLevelPackages", 0)]
     public void AuditAppliesSeverityPolicyToDirectAndTransitivePackages(string severity, string group, int failures)
     {
-        using var report = JsonDocument.Parse($$"""
+        using JsonDocument report = JsonDocument.Parse($$"""
             {"version":1,"projects":[{"path":"project.csproj","frameworks":[{"{{group}}":[{"id":"Example","vulnerabilities":[{"severity":"{{severity}}","advisoryurl":"https://example.invalid/advisory"}]}]}]}]}
             """);
         Assert.Equal(failures, AuditGate.BlockingVulnerabilities(report.RootElement).Length);
@@ -85,14 +85,14 @@ public sealed class GateTests
     [Fact]
     public void NuGetMayOmitFrameworksForProjectsWithoutFindings()
     {
-        using var report = JsonDocument.Parse("{\"version\":1,\"projects\":[{\"path\":\"project.csproj\"}]}");
+        using JsonDocument report = JsonDocument.Parse("{\"version\":1,\"projects\":[{\"path\":\"project.csproj\"}]}");
         Assert.Empty(AuditGate.BlockingVulnerabilities(report.RootElement));
     }
 
     [Fact]
     public void AuditTransportProblemsCannotPassAsNoVulnerabilities()
     {
-        using var report = JsonDocument.Parse("{\"version\":1,\"projects\":[{\"path\":\"project.csproj\"}],\"problems\":[\"source unavailable\"]}");
+        using JsonDocument report = JsonDocument.Parse("{\"version\":1,\"projects\":[{\"path\":\"project.csproj\"}],\"problems\":[\"source unavailable\"]}");
         Assert.Throws<InvalidDataException>(() => AuditGate.BlockingVulnerabilities(report.RootElement));
     }
 
@@ -106,14 +106,14 @@ public sealed class GateTests
 
     private static JsonDocument MakeReport(string assembly, int lineHits, int branchHits)
     {
-        var method = new
+        object method = new
         {
             Lines = new Dictionary<string, int> { ["10"] = lineHits },
             Branches = new[] { new { Line = 10, Offset = 0, Path = 0, Hits = branchHits } },
         };
-        var methods = new Dictionary<string, object> { ["Method()"] = method };
-        var types = new Dictionary<string, object> { ["Example.Type"] = methods };
-        var documents = new Dictionary<string, object> { ["/source.cs"] = types };
+        Dictionary<string, object> methods = new() { ["Method()"] = method };
+        Dictionary<string, object> types = new() { ["Example.Type"] = methods };
+        Dictionary<string, object> documents = new() { ["/source.cs"] = types };
         return JsonDocument.Parse(JsonSerializer.Serialize(new Dictionary<string, object> { [assembly + ".dll"] = documents }));
     }
 }

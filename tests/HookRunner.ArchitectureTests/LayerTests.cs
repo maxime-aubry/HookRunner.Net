@@ -44,7 +44,7 @@ public sealed class LayerTests
     public void CompiledAssembliesHaveNoForbiddenLayerDependencies(string assembly)
     {
         using FileStream stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, assembly + ".dll"));
-        using var pe = new PEReader(stream);
+        using PEReader pe = new(stream);
         MetadataReader metadata = pe.GetMetadataReader();
         string[] references = [.. metadata.AssemblyReferences
             .Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name))

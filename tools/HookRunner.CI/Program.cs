@@ -39,14 +39,14 @@ internal static class Program
         {
             throw new FileNotFoundException("No Coverlet JSON reports were produced.");
         }
-        var reports = new List<JsonElement>();
+        List<JsonElement> reports = [];
         foreach (string path in reportPaths)
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
             reports.Add(document.RootElement.Clone());
         }
 
-        var results = new List<CoverageResult>();
+        List<CoverageResult> results = [];
         foreach (string project in projects)
         {
             string[] inventory = File.ReadAllLines(Path.Combine(artifacts, "inventory", Path.GetFileNameWithoutExtension(project) + ".txt"));
@@ -68,7 +68,7 @@ internal static class Program
 
     private static int CheckAudit(string path)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
         string[] vulnerabilities = AuditGate.BlockingVulnerabilities(document.RootElement);
         foreach (string vulnerability in vulnerabilities)
         {

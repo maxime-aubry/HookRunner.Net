@@ -1,0 +1,3 @@
+# Keep Application and Infrastructure independent
+
+The initial scaffold uses four class libraries with an exhaustive set of permitted direct project references: HookRunner.Core has none, HookRunner.Application and HookRunner.Infrastructure each reference only Core, and HookRunner.CLI references Application and Infrastructure. In particular, Infrastructure does not reference Application; CLI provides the composition boundary between the two. Architecture checks must validate the declared project references as well as code dependencies, so that an unused forbidden reference cannot evade detection.

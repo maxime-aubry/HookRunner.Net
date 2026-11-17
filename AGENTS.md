@@ -14,3 +14,8 @@ read `docs/agents/triage-labels.md`.
 
 Single-context layout. Before exploring the codebase,
 read `docs/agents/domain.md`.
+
+## Coding style
+
+Use explicit types for all C# variable declarations, including `foreach`
+and `using` declarations. The `var` keyword is forbidden.

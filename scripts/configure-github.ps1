@@ -23,7 +23,8 @@ try {
     Invoke-Checked 'gh' @('api', '--method', 'PATCH', "repos/$repository", '--input', $temporary, '--silent')
     $existingText = & gh api "repos/$repository/rulesets"
     if ($LASTEXITCODE -ne 0) { throw 'Cannot list repository rulesets.' }
-    $matching = @($existingText | ConvertFrom-Json | Where-Object { $_.name -in @('Branch naming', 'Pull requests and CI') })
+    $existingRulesets = $existingText | ConvertFrom-Json
+    $matching = @($existingRulesets | Where-Object { $_.name -in @('Branch naming', 'Pull requests and CI') })
     if ($matching.Count -gt 1) { throw 'Ambiguous ruleset selection.' }
     $endpoint = "repos/$repository/rulesets"
     $method = 'POST'

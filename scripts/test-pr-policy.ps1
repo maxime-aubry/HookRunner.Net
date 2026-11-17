@@ -31,3 +31,5 @@ try {
     }
     Write-Output "Passed $count PR policy scenarios."
 } finally { Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue }
+# All expected negative cases were asserted above; do not leak their native exit code.
+$global:LASTEXITCODE = 0

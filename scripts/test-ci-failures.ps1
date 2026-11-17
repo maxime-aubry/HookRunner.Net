@@ -101,3 +101,5 @@ public sealed class FailureProbe
         -not [IO.Path]::GetFileName($resolved).StartsWith('hookrunner-ci-probes-')) { throw 'Refusing unexpected fixture cleanup path.' }
     if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
 }
+# Reached only after every intentional failure was verified and cleanup completed.
+$global:LASTEXITCODE = 0

@@ -1,68 +1,108 @@
 # Contributing
 
+All work targets `develop` through a pull request. Only this repository's
+`develop` branch may target `main`. Both paths use merge commits; squash and
+rebase merges are disabled. Direct commits, pushes, force pushes, and deletions
+of `main` and `develop` are forbidden. Required checks must pass with the source
+branch up to date with its target. No second-person approval is required.
+
 ## Branch names
 
-Use `<prefix>/<description>`. The allowed prefixes are `feat`, `fix`,
-`refactor`, `test`, `docs`, `chore`, and `ci`. The description must contain
-lowercase ASCII letters or digits, with words separated by single hyphens.
-For example: `feat/add-config`, `fix/issue-42`, or `ci/check-branches`.
+Use `<prefix>/<description>`, with a prefix from `feat`, `fix`, `refactor`,
+`test`, `docs`, `chore`, or `ci`. Descriptions use lowercase ASCII letters and
+digits separated by single hyphens. Examples: `feat/add-config`, `fix/issue-42`.
+`perf/` and `build/` are intentionally rejected.
 
-Only `main` and `develop` are exempt. Bot branches follow the same rule;
-configure their branch names accordingly. Prefixes such as `perf` and `build`,
-empty descriptions, accents, underscores, repeated hyphens, and extra `/`
-segments are rejected.
-
-The complete pattern is:
+The ordinary naming pattern is:
 
 ```regex
 ^(main|develop|(feat|fix|refactor|test|docs|chore|ci)/[a-z0-9]+(-[a-z0-9]+)*)$
 ```
 
-## Local setup
+`main` and `develop` are valid names for PR routing, not push destinations.
+The PR checker additionally accepts `dependabot/nuget/...` and
+`dependabot/github_actions/...` only when the head belongs to this repository
+and the PR author is GitHub's `dependabot[bot]` account with type `Bot`.
+Forks and human authors cannot obtain that exception by copying a branch name.
+Other bots must use ordinary names until a specific exception is agreed.
 
-Run this once in each clone, from the repository root:
+## Local setup and checks
+
+Install the exact stable SDK from `global.json`, Git, and PowerShell 7.
+Git for Windows provides Bash; Linux and macOS also need Bash on PATH.
+Enable the versioned hooks in each clone:
 
 ```sh
 git config --local core.hooksPath .githooks
 ```
 
-The hook requires Bash, supplied by Git for Windows and available on Linux
-and macOS. On Linux and macOS, the `pre-push` hook must be executable:
+The hooks are tracked as executable files. If a filesystem does not preserve
+that bit, run `chmod +x .githooks/pre-commit .githooks/pre-push` on Unix.
+The commit hook rejects commits made on `main` or `develop`. The push hook
+checks every destination, including explicit refspecs, and rejects updates or
+deletions of either protected branch. Tags and deletion of working branches
+remain outside the naming check. Hooks can be bypassed; server rules provide
+the enforcement at merge time.
 
-```sh
-chmod +x .githooks/pre-push
+```powershell
+./scripts/validate.ps1
+./scripts/validate.ps1 -Task BuildTest -Locked
+./scripts/validate.ps1 -Task Quality -Locked
+./scripts/validate.ps1 -Task Security -Locked
 ```
 
-Before each push, the hook checks every destination branch name. This includes
-explicit refspecs such as `git push origin HEAD:feat/add-config`. Deleting
-branches and pushing or deleting tags are outside this check. A rejected
-branch can be renamed with `git branch -m <valid-name>`.
+Run these in PowerShell. On Windows PowerShell 5.1 with a restrictive script
+execution policy, a process-only invocation is also supported:
 
-To run validation and integration tests manually:
-
-```sh
-bash scripts/check-branch-name.sh feat/add-config
-bash scripts/test-branch-names.sh
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1
 ```
 
-## Pull requests
+This does not change machine policy or disable application control.
+See [CI documentation](docs/ci.md) for reports, diagnostics, and tool maintenance.
 
-The `Branch naming` workflow validates the source branch of every pull request
-targeting `main` or `develop`, including pull requests from forks and bots.
-It uses the same validator as the local hook. The required check is named
-`Branch name`.
+## Working branches and promotions
 
-On GitHub, an active branch ruleset targeting `main` and `develop` must require
-the `Branch name` status check from GitHub Actions before merging. This setting
-is separate from the workflow file; adding the workflow alone does not make
-the check mandatory. See [GitHub's ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#require-status-checks-to-pass-before-merging).
+```sh
+git fetch origin
+git switch -c feat/example origin/develop
+# Make changes, run checks, and commit on this working branch.
+git push -u origin feat/example
+gh pr create --base develop --head feat/example
+```
 
-The ruleset configuration is versioned in
-[.github/rulesets/branch-naming.json](.github/rulesets/branch-naming.json).
-It accepts the check only from GitHub Actions and has no bypass actors.
-The workflow must be published with the changes before a pull request can
-satisfy this required check.
+Promote with a PR from `develop` to `main`. After its merge, bring the promotion
+commit back through a working branch and another PR:
 
-Local hooks can be bypassed. The required CI check enforces the convention at
-merge time; these controls do not prevent someone from creating an invalid
-branch locally or on GitHub.
+```sh
+git fetch origin
+git switch -c chore/sync-main origin/develop
+git merge origin/main
+git push -u origin chore/sync-main
+gh pr create --base develop --head chore/sync-main
+```
+
+Merge this synchronization PR with a merge commit. Reuse the branch name only
+after its previous PR is merged and the old working branch has been removed.
+Resolve conflicts on working branches and update PRs through that same route.
+
+## GitHub configuration
+
+The required checks are `Branch name` and `CI`, both from GitHub Actions.
+`CI` succeeds only when policy, all three OS test jobs, quality, and security
+succeed. Skipped, failed, or cancelled dependencies make it fail.
+
+The proposed server rules are versioned in
+[the ruleset JSON](.github/rulesets/branch-naming.json). Preview or apply them
+after the implementation PR has successful checks:
+
+```powershell
+./scripts/configure-github.ps1
+./scripts/configure-github.ps1 -Apply -PullRequest <number>
+```
+
+The script sets `develop` as default, permits merge commits only, requires PRs
+and up-to-date checks on both branches, protects deletion and force pushes,
+and enables Dependabot security alerts and fixes. It defines no bypass actors.
+Administrative GitHub access is required. It reads back effective rules;
+the presence of the JSON file alone never establishes an active protection.

@@ -5,7 +5,13 @@ repo_root=$(git rev-parse --show-toplevel)
 
 # Git supplies the destination refs on stdin, including explicit refspecs.
 while read -r local_ref local_oid remote_ref remote_oid; do
-  # Deleting an invalid branch must remain possible.
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/develop)
+      printf 'Direct updates to protected branch %s are forbidden. Use a pull request.\n' "$remote_ref" >&2
+      exit 1
+      ;;
+  esac
+  # Deleting an invalid working branch must remain possible.
   if [ "$local_ref" = '(delete)' ]; then
     continue
   fi

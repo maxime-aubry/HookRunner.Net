@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_NOLOGO: 'true'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  branch-name:
+    name: Branch name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate PR route and source identity
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: ./scripts/check-pr-policy.ps1
+      - name: Test PR policy
+        shell: pwsh
+        run: ./scripts/test-pr-policy.ps1
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Build, test, and enforce coverage
+        shell: pwsh
+        run: ./scripts/validate.ps1 -Task BuildTest -Locked
+      - name: Coverage summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path artifacts/coverage/gate.md) {
+            Get-Content artifacts/coverage/gate.md | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-${{ matrix.os }}
+          path: |
+            artifacts/tests/
+            artifacts/coverage/
+            artifacts/analysis/
+          retention-days: 7
+          if-no-files-found: error
+
+  quality:
+    name: Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Format, analyzers, documentation, and workflows
+        shell: pwsh
+        run: ./scripts/validate.ps1 -Task Quality -Locked
+      - name: Prove that quality gates reject intentional failures
+        shell: pwsh
+        run: ./scripts/test-ci-failures.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: quality
+          path: |
+            artifacts/format.json
+            artifacts/analysis/
+            artifacts/probes/
+          retention-days: 7
+
+  security:
+    name: Security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Audit packages and scan secrets
+        shell: pwsh
+        run: ./scripts/validate.ps1 -Task Security -Locked
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: security
+          path: artifacts/security/
+          retention-days: 7
+          if-no-files-found: error
+
+  required:
+    name: CI
+    needs: [branch-name, test, quality, security]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every check to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        shell: pwsh
+        run: |
+          $jobs = $env:RESULTS | ConvertFrom-Json
+          foreach ($job in $jobs.PSObject.Properties) {
+            if ($job.Value.result -ne 'success') {
+              throw "Required job $($job.Name) finished with $($job.Value.result)"
+            }
+          }
+          'All required jobs passed.' | Add-Content $env:GITHUB_STEP_SUMMARY

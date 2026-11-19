@@ -54,8 +54,10 @@ git config commit.gpgSign false
 git config core.hooksPath .githooks
 mkdir -p .githooks scripts
 cp "$repo_root/.githooks/pre-push" .githooks/pre-push
+cp "$repo_root/.githooks/pre-commit" .githooks/pre-commit
 cp "$validator" scripts/check-branch-name.sh
 chmod +x .githooks/pre-push
+chmod +x .githooks/pre-commit
 git -c core.hooksPath=/dev/null commit --quiet --allow-empty -m 'Test fixture'
 git remote add origin "$fixture/remote.git"
 
@@ -70,12 +72,15 @@ expect_push() {
     exit 1
   fi
   if [[ $expected == fail ]]; then
-    grep -q 'Invalid branch name:' "$fixture/push.log"
+    grep -Eq 'Invalid branch name:|Direct updates to protected branch' "$fixture/push.log"
   fi
   push_count=$((push_count + 1))
 }
 
-expect_push pass HEAD:refs/heads/main HEAD:refs/heads/develop
+expect_push fail HEAD:refs/heads/main
+expect_push fail HEAD:refs/heads/develop
+expect_push fail :refs/heads/main
+expect_push fail :refs/heads/develop
 expect_push pass HEAD:refs/heads/feat/add-config
 expect_push fail HEAD:refs/heads/invalid-name
 # Destination name is authoritative, even when the local branch is invalid.
@@ -95,6 +100,18 @@ expect_push pass refs/tags/arbitrary-tag
 git -c core.hooksPath=/dev/null push --quiet origin HEAD:refs/heads/legacy-name
 expect_push pass :refs/heads/legacy-name
 expect_push pass :refs/tags/arbitrary-tag
+
+commit_status=0
+git commit --quiet --allow-empty -m 'Forbidden direct commit' >"$fixture/commit.log" 2>&1 || commit_status=$?
+[[ $commit_status -ne 0 ]] || { printf 'FAIL: direct commit on main passed\n' >&2; exit 1; }
+grep -q 'Direct commits to main are forbidden' "$fixture/commit.log"
+git switch --quiet -c develop
+commit_status=0
+git commit --quiet --allow-empty -m 'Forbidden direct commit' >"$fixture/commit.log" 2>&1 || commit_status=$?
+[[ $commit_status -ne 0 ]] || { printf 'FAIL: direct commit on develop passed\n' >&2; exit 1; }
+grep -q 'Direct commits to develop are forbidden' "$fixture/commit.log"
+git switch --quiet -c chore/allowed-commit
+git commit --quiet --allow-empty -m 'Allowed working branch commit'
 
 printf 'Passed: %s branch-name cases, argument validation, and %s local push scenarios.\n' \
   "$name_count" "$push_count"

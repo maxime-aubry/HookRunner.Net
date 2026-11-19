@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HookRunner.Core/HookRunner.Core.csproj" />
+    <Project Path="src/HookRunner.Application/HookRunner.Application.csproj" />
+    <Project Path="src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj" />
+    <Project Path="src/HookRunner.CLI/HookRunner.CLI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HookRunner.ArchitectureTests/HookRunner.ArchitectureTests.csproj" />
+    <Project Path="tests/HookRunner.CITests/HookRunner.CITests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/HookRunner.CI/HookRunner.CI.csproj" />
+  </Folder>
+</Solution>

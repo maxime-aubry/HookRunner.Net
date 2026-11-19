@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../tools/HookRunner.CI/HookRunner.CI.csproj" />
+  </ItemGroup>
+</Project>

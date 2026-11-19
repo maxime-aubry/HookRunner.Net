@@ -16,6 +16,10 @@ links, and workflows. `Security` queries NuGet and runs the free Gitleaks CLI
 against Git history and the working tree with fully redacted reports.
 Each task stops on a failed native command; no `continue-on-error` is used.
 CI restores NuGet lock files in locked mode and caches packages by lock content.
+After the coverage gate, `scripts/test-consumer-packages.ps1` packs the four
+libraries and builds an independent console host with package references from
+a checkout-local feed. It executes a Codex invocation and its child process
+without an installed agent or model. This runs in every OS test job.
 
 Full build/test/coverage runs on Ubuntu 24.04 x64, Windows Server 2025 x64 and
 macOS 15 Arm64. These are representative supported systems, not evidence of
@@ -75,7 +79,7 @@ global average cannot compensate for an uncovered assembly. Gate regression
 tests cover missing assemblies/documents, independent branch failure, and
 merging suite results. A missing or malformed collector report fails.
 
-The initial libraries contain no business code. A library without coverable
+Domain currently contains no business code. A library without coverable
 sequence points is explicitly `not-applicable`, never claimed as tested at
 100%. Raw Coverlet output may display 100% for an empty module and emit a
 no-hits warning; `gate.json` and `gate.md` provide the authoritative status.

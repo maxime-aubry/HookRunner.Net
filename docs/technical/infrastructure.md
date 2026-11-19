@@ -1,0 +1,56 @@
+# HookRunner.Infrastructure
+
+[Retour à l'index](README.md). Les adaptateurs dépendent des contrats
+d'Application et ne déplacent aucune règle métier dans les protocoles.
+Les commentaires XML des sources détaillent les paramètres, retours et erreurs.
+
+## CodexEventAdapter
+
+[Source](../../src/HookRunner.Infrastructure/Agents/Codex/CodexEventAdapter.cs).
+`Parse` exige un objet JSON avec `session_id`, `hook_event_name` et `cwd`
+non vides. Le dossier doit être absolu et existant. `RequiredString` centralise
+la validation des champs. L'invocation conserve exactement le JSON d'origine,
+porte l'agent `codex` et n'invente pas de projet ni de session de secours.
+
+## HookOptionsPreparer
+
+[Source](../../src/HookRunner.Infrastructure/Configuration/HookOptionsPreparer.cs).
+`Prepare` applique la surcharge du timeout, valide sa positivité et exige
+un chemin d'état configuré relatif à la racine. Les chemins enracinés et les
+destinations normalisées hors de la solution sont refusés avant l'exécution.
+La sélection de projets est encore refusée.
+Depuis le dossier de l'agent, il remonte jusqu'au premier dossier contenant
+un fichier `.sln` ou `.slnx`. La racine devient le dossier par défaut ; le
+chemin d'état y est résolu et la liste de projets reste vide. Il ne crée
+pas d'état et ne déclenche aucune minuterie.
+
+## ChildProcessCommand
+
+[Source](../../src/HookRunner.Infrastructure/Execution/ChildProcessCommand.cs).
+`ForCurrentProcess` prépare le relancement du consommateur. Avec `dotnet`,
+le premier argument est l'assembly d'entrée ; avec un apphost, l'exécutable
+se relance directement. Les arguments du protocole seront ajoutés ensuite.
+
+## ProcessHookExecutor
+
+[Source](../../src/HookRunner.Infrastructure/Execution/ProcessHookExecutor.cs).
+`ExecuteAsync` crée un dossier temporaire, sérialise la requête et lance
+le consommateur avec les chemins de transport. Il ferme stdin et draine
+stdout et stderr sans les recopier dans les diagnostics du superviseur.
+Le dossier de travail provient des options préparées.
+
+Une attente interrompue entraîne l'arrêt de l'arbre de processus et une
+confirmation bornée à cinq secondes. Un code enfant non nul ou un résultat
+absent provoque une erreur technique. La version, le statut et la présence
+d'un diagnostic pour les échecs sont vérifiés avant de rendre un résultat
+neutre à Application. Le dossier temporaire est supprimé dans `finally`.
+Les erreurs de transport, d'annulation ou de nettoyage remontent à Context.
+
+## Protocole interne
+
+Les constantes de [ChildHookProtocol](../../src/HookRunner.Infrastructure/Execution/Protocol/ChildHookProtocol.cs)
+définissent le marqueur `--hookrunner-child` et la version `1`.
+[ChildHookResult](../../src/HookRunner.Infrastructure/Execution/Protocol/ChildHookResult.cs)
+contient version, statut obligatoire et diagnostic facultatif en cas de succès.
+Le code de sortie de l'enfant décrit le transport ; le statut du hook se lit
+dans ce résultat. Les modèles de transport restent dans Infrastructure.

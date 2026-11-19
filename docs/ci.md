@@ -153,11 +153,12 @@ serverless scaffold; SDK analyzers run directly in CI.
 [SonarQube Community documentation](https://docs.sonarsource.com/sonarqube-community-build/).
 Gitleaks uses its free CLI, avoiding any Action-specific licensing dependency.
 
-NuGet packing, documentation-site builds, Pages deployment, integration services,
-and benchmarks are not applicable to this empty internal-library milestone.
-There is no distributed package, generated documentation site, external service
-or critical business operation. Add meaningful integration tests when a service
-appears. When a critical operation exists, use BenchmarkDotNet in a separate
+CI packs the four libraries into a local NuGet feed and builds an independent
+test consumer to verify package integration and isolated child execution.
+Documentation-site builds, Pages deployment, external integration services,
+and benchmarks are not configured for this milestone. There is no generated
+documentation site or external service. When a critical operation exists,
+use BenchmarkDotNet in a separate
 manual/scheduled workflow, retain results, and avoid timing gates on noisy
 shared runners. No public deployment or package publication is configured.
 

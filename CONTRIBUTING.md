@@ -28,6 +28,18 @@ Other bots must use ordinary names until a specific exception is agreed.
 
 ## Local setup and checks
 
+Keep C# files grouped by responsibility inside their existing architecture layer.
+Application contains use cases and execution contracts; Infrastructure implements
+the adapters; Cli composes services and handles entry points. Put each top-level
+type in its own file. See the [source layout](docs/technical/README.md#organisation-des-sources).
+
+Document every handwritten method and constructor, including private members,
+tests and fixtures, with XML comments describing its purpose, each parameter,
+return value, relevant errors and side effects. Document primary constructors
+on their type declaration. Production builds generate XML documentation and
+treat missing public API documentation as an error. Use explicit C# types for
+all variable declarations, including `foreach` and `using`; `var` is forbidden.
+
 Install the exact stable SDK from `global.json`, Git, and PowerShell 7.
 Git for Windows provides Bash; Linux and macOS also need Bash on PATH.
 Enable the versioned hooks in each clone:

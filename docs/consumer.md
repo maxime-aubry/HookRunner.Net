@@ -60,7 +60,8 @@ Copy your single `appsettings.json` beside the compiled executable:
 
 The file is loaded from `AppContext.BaseDirectory`, independently of the launch
 directory and the solution under inspection. `StateFilePath` is required and
-resolved relative to the solution root. A missing timeout defaults to 120
+resolved relative to the solution root. Rooted paths and paths that normalize
+outside that root are preparation errors. A missing timeout defaults to 120
 seconds; `--timeout` overrides it with a positive integer.
 
 For a hook whose `Name` is `my_hook`, launch the consumer from source with:

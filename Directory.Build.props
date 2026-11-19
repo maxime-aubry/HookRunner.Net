@@ -18,5 +18,6 @@
     <NuGetAuditMode>all</NuGetAuditMode>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902</WarningsNotAsErrors>
     <IsProductionProject Condition="$(MSBuildProjectDirectory.Contains('$(MSBuildThisFileDirectory)src'))">true</IsProductionProject>
+    <GenerateDocumentationFile Condition="'$(IsProductionProject)' == 'true'">true</GenerateDocumentationFile>
   </PropertyGroup>
 </Project>

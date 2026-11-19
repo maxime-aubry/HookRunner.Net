@@ -9,6 +9,10 @@ an isolated child process. See the [consumer guide](docs/consumer.md).
 See [contribution instructions](CONTRIBUTING.md), [CI documentation](docs/ci.md),
 and [architecture decisions](docs/adr/).
 
+The [technical documentation](docs/technical/README.md) describes the source
+layout and current implementation. Method contracts are documented directly
+in the C# sources with XML comments.
+
 See [Architecture de HookRunner](docs/architecture.md) for the complete project
 design, business rules, execution contracts, configuration, and validation
 criteria. Domain vocabulary is defined in [GLOSSARY.md](GLOSSARY.md).

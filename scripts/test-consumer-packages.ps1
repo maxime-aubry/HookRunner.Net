@@ -21,8 +21,8 @@ try {
   </ItemGroup>
 </Project>
 '@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $consumer 'Consumer.csproj')
-    foreach ($file in @('Program.cs', 'InspectHook.cs', 'appsettings.json')) {
-        Copy-Item -LiteralPath "fixtures/HookRunner.TestHost/$file" -Destination $consumer -Force
+    foreach ($entry in @('Hosting', 'Hooks', 'Services', 'Observations', 'appsettings.json')) {
+        Copy-Item -LiteralPath "fixtures/HookRunner.TestHost/$entry" -Destination $consumer -Recurse -Force
     }
     $escapedFeed = [Security.SecurityElement]::Escape($feed)
     @"

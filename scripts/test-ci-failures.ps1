@@ -55,21 +55,41 @@ public sealed class FailureProbe
     Expect-Failure 'format' @('format', 'whitespace', 'HookRunner.slnx', '--no-restore', '--verify-no-changes') 'FailureProbe.cs'
     Remove-Item -LiteralPath $probe
 
-    $coreProbe = Join-Path $fixture 'src/HookRunner.Core/FailureProbe.cs'
-    [IO.File]::WriteAllText($coreProbe, 'namespace HookRunner.Core; public static class FailureProbe { public static void Fails() { try { throw new System.InvalidOperationException(); } catch (System.Exception exception) { throw exception; } } }')
-    Expect-Failure 'analyzer' @('build', 'src/HookRunner.Core/HookRunner.Core.csproj', '-c', 'Release', '--no-restore') 'CA2200'
-    Remove-Item -LiteralPath $coreProbe
+    $domainProbe = Join-Path $fixture 'src/HookRunner.Domain/FailureProbe.cs'
+    [IO.File]::WriteAllText($domainProbe, 'namespace HookRunner.Domain; public static class FailureProbe { public static void Fails() { try { throw new System.InvalidOperationException(); } catch (System.Exception exception) { throw exception; } } }')
+    Expect-Failure 'analyzer' @('build', 'src/HookRunner.Domain/HookRunner.Domain.csproj', '-c', 'Release', '--no-restore') 'CA2200'
+    Remove-Item -LiteralPath $domainProbe
 
-    $infraPath = Join-Path $fixture 'src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj'
-    $original = [IO.File]::ReadAllText($infraPath)
-    [IO.File]::WriteAllText($infraPath, $original.Replace('</ItemGroup>', '<ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" /></ItemGroup>'))
+    $cliPath = Join-Path $fixture 'src/HookRunner.Cli/HookRunner.Cli.csproj'
+    $originalCli = [IO.File]::ReadAllText($cliPath)
+    [IO.File]::WriteAllText($cliPath, $originalCli.Replace('</ItemGroup>', '<ProjectReference Include="../HookRunner.Domain/HookRunner.Domain.csproj" /></ItemGroup>'))
     Invoke-Checked $dotnet @('restore', 'HookRunner.slnx')
     Expect-Failure 'architecture' @('test', $arch, '-c', 'Release', '--no-restore') 'EvaluatedProjectReferencesMatchThePolicy'
-    [IO.File]::WriteAllText($infraPath, $original)
+    [IO.File]::WriteAllText($cliPath, $originalCli)
     Invoke-Checked $dotnet @('restore', 'HookRunner.slnx')
 
-    [IO.File]::WriteAllText($coreProbe, @'
-namespace HookRunner.Core;
+    # Inject a binary reference only: the evaluated project-reference graph stays valid.
+    $cliProbe = Join-Path $fixture 'src/HookRunner.Cli/FailureProbe.cs'
+    [IO.File]::WriteAllText($cliProbe, 'namespace HookRunner.Cli; public static class FailureProbe { public static int Value => 1; }')
+    Invoke-Checked $dotnet @('build', 'src/HookRunner.Cli/HookRunner.Cli.csproj', '-c', 'Release', '--no-restore')
+    $infraPath = Join-Path $fixture 'src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj'
+    $originalInfra = [IO.File]::ReadAllText($infraPath)
+    $infraProbe = Join-Path $fixture 'src/HookRunner.Infrastructure/FailureProbe.cs'
+    [IO.File]::WriteAllText($infraProbe, 'namespace HookRunner.Infrastructure; public static class FailureProbe { public static int Value => Cli.FailureProbe.Value; }')
+    [IO.File]::WriteAllText($infraPath, $originalInfra.Replace('</ItemGroup>', '<Reference Include="HookRunner.Cli"><HintPath>../HookRunner.Cli/bin/Release/net11.0/HookRunner.Cli.dll</HintPath></Reference></ItemGroup>'))
+    Invoke-Checked $dotnet @('test', $arch, '-c', 'Release', '--no-restore', '--filter', 'FullyQualifiedName~EvaluatedProjectReferencesMatchThePolicy')
+    Expect-Failure 'architecture-compiled' @('test', $arch, '-c', 'Release', '--no-build', '--no-restore', '--filter', 'FullyQualifiedName~CompiledAssembliesHaveNoForbiddenLayerDependencies') 'CompiledAssembliesHaveNoForbiddenLayerDependencies'
+    [IO.File]::WriteAllText($infraPath, $originalInfra)
+    Remove-Item -LiteralPath $infraProbe, $cliProbe
+
+    [IO.File]::WriteAllText($cliPath, $originalCli.Replace('<OutputType>Library</OutputType>', '<OutputType>Exe</OutputType>'))
+    [IO.File]::WriteAllText($cliProbe, 'namespace HookRunner.Cli; internal static class FailureProbe { private static void Main() { } }')
+    Expect-Failure 'cli-library' @('test', $arch, '-c', 'Release', '--no-restore', '--filter', 'FullyQualifiedName~CliRemainsAClassLibrary') 'CliRemainsAClassLibrary'
+    [IO.File]::WriteAllText($cliPath, $originalCli)
+    Remove-Item -LiteralPath $cliProbe
+
+    [IO.File]::WriteAllText($domainProbe, @'
+namespace HookRunner.Domain;
 
 public static class FailureProbe
 {
@@ -82,17 +102,17 @@ namespace HookRunner.ArchitectureTests;
 public sealed class FailureProbe
 {
     [Fact]
-    public void CoversOneBranch() => Assert.Equal(1, Core.FailureProbe.Choose(true));
+    public void CoversOneBranch() => Assert.Equal(1, Domain.FailureProbe.Choose(true));
 }
 '@)
     $coverage = Join-Path $fixture 'artifacts/coverage/probe/'
     New-Item -ItemType Directory -Force -Path $coverage | Out-Null
     Invoke-Checked $dotnet @('test', $arch, '-c', 'Release', '--no-restore', '-p:CollectCoverage=true',
-        '-p:CoverletOutputFormat=json', "-p:CoverletOutput=$coverage", '-p:Include=[HookRunner.Core]*', '-p:IncludeTestAssembly=false')
+        '-p:CoverletOutputFormat=json', "-p:CoverletOutput=$coverage", '-p:Include=[HookRunner.Domain]*', '-p:IncludeTestAssembly=false')
     Expect-Failure 'coverage-branch' @('tools/HookRunner.CI/bin/Release/net11.0/HookRunner.CI.dll', 'coverage', $fixture) 'failed'
     $gate = Get-Content -Raw -LiteralPath (Join-Path $fixture 'artifacts/coverage/gate.json') | ConvertFrom-Json
-    $core = $gate | Where-Object { $_.Assembly -ceq 'HookRunner.Core' }
-    if ($core.Status -cne 'failed' -or $core.UncoveredLines.Count -ne 0 -or $core.UncoveredBranches.Count -eq 0) { throw 'Expected full line coverage but missing branch coverage.' }
+    $domain = $gate | Where-Object { $_.Assembly -ceq 'HookRunner.Domain' }
+    if ($domain.Status -cne 'failed' -or $domain.UncoveredLines.Count -ne 0 -or $domain.UncoveredBranches.Count -eq 0) { throw 'Expected full line coverage but missing branch coverage.' }
     $results | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $reports 'summary.json')
 } finally {
     Set-Location $sourceRoot

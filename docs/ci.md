@@ -47,6 +47,12 @@ agreed direct-reference graph. Evaluated build inventories also catch unused
 references added by imports. Metadata tests catch forbidden compiled assembly
 references. Neither tests nor analyzers prove all SOLID principles.
 
+The four production libraries are `HookRunner.Domain`, `HookRunner.Application`,
+`HookRunner.Infrastructure`, and `HookRunner.Cli`. Domain has no internal
+references; Application references Domain; Infrastructure references Domain and
+Application; Cli references Application and Infrastructure and remains a class
+library. This graph is recorded in [ADR 0004](adr/0004-validated-layer-dependencies.md).
+
 IDE0005 is checked by formatting at information severity: enforcing it during
 compilation would require enabling XML documentation generation. Other enabled
 compiler/analyzer warnings remain errors. No extra StyleCop package is needed
@@ -99,6 +105,11 @@ test, uncovered branch, formatting error, analyzer violation, and forbidden
 project reference fail the appropriate command. Unit tests also verify NuGet
 severity policy and coverage report omissions. Fixtures are separate from the
 four production libraries.
+
+The architecture probes introduce an unused Cli-to-Domain
+project reference and a compiled dependency on Cli, verifying both dependency
+checks independently. A separate probe changes Cli to an executable to verify
+that its class-library constraint is enforced.
 
 For dependency changes, update central versions, run `dotnet restore` without
 locked mode to regenerate locks, review lock diffs, then run full validation.

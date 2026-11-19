@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="../HookRunner.Core/HookRunner.Core.csproj" />
+    <ProjectReference Include="../HookRunner.Domain/HookRunner.Domain.csproj" />
+    <ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" />
   </ItemGroup>
 </Project>

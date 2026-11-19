@@ -125,7 +125,7 @@
       "hookrunner.application": {
         "type": "Project",
         "dependencies": {
-          "HookRunner.Core": "[1.0.0, )"
+          "HookRunner.Domain": "[1.0.0, )"
         }
       },
       "hookrunner.cli": {
@@ -135,13 +135,14 @@
           "HookRunner.Infrastructure": "[1.0.0, )"
         }
       },
-      "hookrunner.core": {
+      "hookrunner.domain": {
         "type": "Project"
       },
       "hookrunner.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "HookRunner.Core": "[1.0.0, )"
+          "HookRunner.Application": "[1.0.0, )",
+          "HookRunner.Domain": "[1.0.0, )"
         }
       }
     }

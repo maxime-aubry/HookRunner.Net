@@ -2,7 +2,13 @@
   "version": 2,
   "dependencies": {
     "net11.0": {
-      "hookrunner.core": {
+      "hookrunner.application": {
+        "type": "Project",
+        "dependencies": {
+          "HookRunner.Domain": "[1.0.0, )"
+        }
+      },
+      "hookrunner.domain": {
         "type": "Project"
       }
     }

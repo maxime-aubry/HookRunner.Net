@@ -1,0 +1,7 @@
+title = "HookRunner secret detection"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated build output and local downloaded tooling"
+paths = ['''(^|/)artifacts/''', '''(^|/)(bin|obj)/''', '''(^|/)\.git/''']

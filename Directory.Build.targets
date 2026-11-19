@@ -1,0 +1,12 @@
+<Project>
+  <Target Name="CreateAnalysisDirectory" BeforeTargets="CoreCompile">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)artifacts/analysis" />
+  </Target>
+  <!-- Persist evaluated references, including references added by imported targets. -->
+  <Target Name="WriteProductionInventory" AfterTargets="Build" Condition="'$(IsProductionProject)' == 'true'">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)artifacts/inventory" />
+    <WriteLinesToFile File="$(MSBuildThisFileDirectory)artifacts/inventory/$(MSBuildProjectName).txt"
+                      Lines="$(MSBuildProjectFullPath);$(AssemblyName);$(TargetPath);$(TargetDir)$(TargetName).pdb;@(ProjectReference->'%(FullPath)')"
+                      Overwrite="true" Encoding="UTF-8" />
+  </Target>
+</Project>

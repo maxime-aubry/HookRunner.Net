@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+branch=$(git symbolic-ref --quiet --short HEAD || true)
+case "$branch" in
+  main|develop)
+    printf 'Direct commits to %s are forbidden. Create a working branch and open a pull request.\n' "$branch" >&2
+    exit 1
+    ;;
+esac

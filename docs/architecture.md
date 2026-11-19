@@ -278,8 +278,9 @@ signalent des erreurs techniques. Leur traitement appartient à `Context`.
 
 Lorsqu'une sortie brute de commande ou de prompt est incluse dans un
 diagnostic, seuls ses **8 000 premiers caractères** sont conservés, comme
-dans `hook_common.py`. Cette limite ne tronque pas le résultat fourni à la
-stratégie pour son analyse, ni les consignes de correction jointes au message.
+dans [hook_common.py](reference/python-hooks/hook_common.py). Cette limite ne
+tronque pas le résultat fourni à la stratégie pour son analyse, ni les
+consignes de correction jointes au message.
 La construction du diagnostic distingue donc les sorties brutes et les
 consignes ; le contexte ne cherche pas à les séparer en analysant le texte
 final d'une exception.
@@ -476,8 +477,9 @@ succès doit pouvoir réinitialiser le compteur et une erreur technique reste
 une erreur. Après un succès, un nouvel échec dispose à nouveau du plafond.
 
 Cette politique reprend le comportement de
-[`hook_common.py`](../hook_common.py) pour le succès, les corrections, le
-plafond et le retour permissif après timeout. Comme `subprocess.run` en Python,
+[hook_common.py](reference/python-hooks/hook_common.py) pour le succès, les
+corrections, le plafond et le retour permissif après timeout. Comme
+`subprocess.run` en Python,
 HookRunner impose un arrêt forcé du processus exécutant le traitement à
 l'expiration du timeout. La supervision inclut également les processus
 suivis ; l'impossibilité de confirmer leur arrêt reste une erreur technique.
@@ -582,7 +584,8 @@ Un arrêt forcé ne garantit ni l'exécution des blocs `finally` du hook ni
 l'annulation des modifications déjà effectuées dans les fichiers.
 
 Cette décision reprend le principe d'arrêt forcé de
-`subprocess.run(..., timeout=...)` utilisé dans `hook_common.py` et remplace
+`subprocess.run(..., timeout=...)` utilisé dans
+[hook_common.py](reference/python-hooks/hook_common.py) et remplace
 l'attente coopérative potentiellement illimitée initialement retenue.
 Le coût accepté pour imposer cette limite est une frontière de processus
 et un protocole interne de résultat ; le superviseur conserve le verrou
@@ -621,7 +624,8 @@ forcer un événement informatif à bloquer l'agent. Il ne peut pas non plus
 produire lui-même une décision s'il ne démarre pas ou si l'hôte l'interrompt
 avant qu'il puisse répondre.
 
-Le retour au chatbot suit le fonctionnement de `hook_common.py` :
+Le retour au chatbot suit le fonctionnement de
+[hook_common.py](reference/python-hooks/hook_common.py) :
 
 - l'agent lance le programme consommateur depuis sa configuration native ;
 - le programme lit les données d'événement sur son entrée standard ;

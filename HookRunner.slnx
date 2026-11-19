@@ -1,9 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/HookRunner.Core/HookRunner.Core.csproj" />
+    <Project Path="src/HookRunner.Domain/HookRunner.Domain.csproj" />
     <Project Path="src/HookRunner.Application/HookRunner.Application.csproj" />
     <Project Path="src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj" />
-    <Project Path="src/HookRunner.CLI/HookRunner.CLI.csproj" />
+    <Project Path="src/HookRunner.Cli/HookRunner.Cli.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/HookRunner.ArchitectureTests/HookRunner.ArchitectureTests.csproj" />

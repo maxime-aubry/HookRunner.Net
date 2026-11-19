@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" />
     <ProjectReference Include="../HookRunner.Infrastructure/HookRunner.Infrastructure.csproj" />

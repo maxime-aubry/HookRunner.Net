@@ -7,10 +7,10 @@ public sealed class LayerTests
 {
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
-        ["HookRunner.Core"] = [],
-        ["HookRunner.Application"] = ["HookRunner.Core"],
-        ["HookRunner.Infrastructure"] = ["HookRunner.Core"],
-        ["HookRunner.CLI"] = ["HookRunner.Application", "HookRunner.Infrastructure"],
+        ["HookRunner.Domain"] = [],
+        ["HookRunner.Application"] = ["HookRunner.Domain"],
+        ["HookRunner.Infrastructure"] = ["HookRunner.Domain", "HookRunner.Application"],
+        ["HookRunner.Cli"] = ["HookRunner.Application", "HookRunner.Infrastructure"],
     };
 
     [Fact]
@@ -22,10 +22,10 @@ public sealed class LayerTests
     }
 
     [Theory]
-    [InlineData("HookRunner.Core")]
+    [InlineData("HookRunner.Domain")]
     [InlineData("HookRunner.Application")]
     [InlineData("HookRunner.Infrastructure")]
-    [InlineData("HookRunner.CLI")]
+    [InlineData("HookRunner.Cli")]
     public void EvaluatedProjectReferencesMatchThePolicy(string assembly)
     {
         string manifest = Path.Combine(RepositoryRoot(), "artifacts", "inventory", assembly + ".txt");
@@ -37,19 +37,28 @@ public sealed class LayerTests
     }
 
     [Theory]
-    [InlineData("HookRunner.Core")]
+    [InlineData("HookRunner.Domain")]
     [InlineData("HookRunner.Application")]
     [InlineData("HookRunner.Infrastructure")]
-    [InlineData("HookRunner.CLI")]
+    [InlineData("HookRunner.Cli")]
     public void CompiledAssembliesHaveNoForbiddenLayerDependencies(string assembly)
     {
         using FileStream stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, assembly + ".dll"));
         using PEReader pe = new(stream);
         MetadataReader metadata = pe.GetMetadataReader();
+        Assert.Equal(assembly, metadata.GetString(metadata.GetAssemblyDefinition().Name));
         string[] references = [.. metadata.AssemblyReferences
             .Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name))
             .Where(name => name.StartsWith("HookRunner.", StringComparison.Ordinal))];
         Assert.All(references, reference => Assert.Contains(reference, Allowed[assembly]));
+    }
+
+    [Fact]
+    public void CliRemainsAClassLibrary()
+    {
+        using FileStream stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "HookRunner.Cli.dll"));
+        using PEReader pe = new(stream);
+        Assert.True(pe.PEHeaders.IsDll, "HookRunner.Cli must remain a class library; the consumer supplies the executable.");
     }
 
     private static string RepositoryRoot()

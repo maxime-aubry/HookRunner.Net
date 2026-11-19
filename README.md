@@ -8,4 +8,8 @@ for a future host; this milestone has no executable or business behavior.
 See [contribution instructions](CONTRIBUTING.md), [CI documentation](docs/ci.md),
 and [architecture decisions](docs/adr/).
 
+See [Architecture de HookRunner](docs/architecture.md) for the complete project
+design, business rules, execution contracts, configuration, and validation
+criteria. Domain vocabulary is defined in [GLOSSARY.md](GLOSSARY.md).
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and local hook setup.

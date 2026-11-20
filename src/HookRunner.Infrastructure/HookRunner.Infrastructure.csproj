@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../HookRunner.Domain/HookRunner.Domain.csproj" />
     <ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" />

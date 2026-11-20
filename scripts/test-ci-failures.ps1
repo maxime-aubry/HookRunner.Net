@@ -56,7 +56,26 @@ public sealed class FailureProbe
     Remove-Item -LiteralPath $probe
 
     $domainProbe = Join-Path $fixture 'src/HookRunner.Domain/FailureProbe.cs'
-    [IO.File]::WriteAllText($domainProbe, 'namespace HookRunner.Domain; public static class FailureProbe { public static void Fails() { try { throw new System.InvalidOperationException(); } catch (System.Exception exception) { throw exception; } } }')
+    [IO.File]::WriteAllText($domainProbe, @'
+namespace HookRunner.Domain;
+
+/// <summary>Provides an intentional analyzer violation.</summary>
+public static class FailureProbe
+{
+    /// <summary>Rethrows an exception in a way that loses its original stack trace.</summary>
+    public static void Fails()
+    {
+        try
+        {
+            throw new System.InvalidOperationException();
+        }
+        catch (System.Exception exception)
+        {
+            throw exception;
+        }
+    }
+}
+'@)
     Expect-Failure 'analyzer' @('build', 'src/HookRunner.Domain/HookRunner.Domain.csproj', '-c', 'Release', '--no-restore') 'CA2200'
     Remove-Item -LiteralPath $domainProbe
 
@@ -70,12 +89,30 @@ public sealed class FailureProbe
 
     # Inject a binary reference only: the evaluated project-reference graph stays valid.
     $cliProbe = Join-Path $fixture 'src/HookRunner.Cli/FailureProbe.cs'
-    [IO.File]::WriteAllText($cliProbe, 'namespace HookRunner.Cli; public static class FailureProbe { public static int Value => 1; }')
+    [IO.File]::WriteAllText($cliProbe, @'
+namespace HookRunner.Cli;
+
+/// <summary>Exposes the intentional binary dependency.</summary>
+public static class FailureProbe
+{
+    /// <summary>Gets the dependency marker.</summary>
+    public static int Value => 1;
+}
+'@)
     Invoke-Checked $dotnet @('build', 'src/HookRunner.Cli/HookRunner.Cli.csproj', '-c', 'Release', '--no-restore')
     $infraPath = Join-Path $fixture 'src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj'
     $originalInfra = [IO.File]::ReadAllText($infraPath)
     $infraProbe = Join-Path $fixture 'src/HookRunner.Infrastructure/FailureProbe.cs'
-    [IO.File]::WriteAllText($infraProbe, 'namespace HookRunner.Infrastructure; public static class FailureProbe { public static int Value => Cli.FailureProbe.Value; }')
+    [IO.File]::WriteAllText($infraProbe, @'
+namespace HookRunner.Infrastructure;
+
+/// <summary>Introduces the forbidden compiled dependency on Cli.</summary>
+public static class FailureProbe
+{
+    /// <summary>Gets the marker from the forbidden dependency.</summary>
+    public static int Value => Cli.FailureProbe.Value;
+}
+'@)
     [IO.File]::WriteAllText($infraPath, $originalInfra.Replace('</ItemGroup>', '<Reference Include="HookRunner.Cli"><HintPath>../HookRunner.Cli/bin/Release/net11.0/HookRunner.Cli.dll</HintPath></Reference></ItemGroup>'))
     Invoke-Checked $dotnet @('test', $arch, '-c', 'Release', '--no-restore', '--filter', 'FullyQualifiedName~EvaluatedProjectReferencesMatchThePolicy')
     Expect-Failure 'architecture-compiled' @('test', $arch, '-c', 'Release', '--no-build', '--no-restore', '--filter', 'FullyQualifiedName~CompiledAssembliesHaveNoForbiddenLayerDependencies') 'CompiledAssembliesHaveNoForbiddenLayerDependencies'
@@ -91,8 +128,12 @@ public sealed class FailureProbe
     [IO.File]::WriteAllText($domainProbe, @'
 namespace HookRunner.Domain;
 
+/// <summary>Provides a branch that the probe deliberately leaves uncovered.</summary>
 public static class FailureProbe
 {
+    /// <summary>Chooses a value using the branch under test.</summary>
+    /// <param name="value">The branch selector.</param>
+    /// <returns>One for true, otherwise two.</returns>
     public static int Choose(bool value) => value ? 1 : 2;
 }
 '@)

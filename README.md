@@ -1,12 +1,17 @@
 # HookRunner.Net
 Hook runner for .NET projects.
 
-The initial scaffold targets .NET 11 and contains four class libraries:
-Domain, Application, Infrastructure, and Cli. HookRunner.Cli prepares composition
-for a future host; this milestone has no executable or business behavior.
+HookRunner targets .NET 11 and contains four class libraries:
+Domain, Application, Infrastructure, and Cli. A consumer executable defines its
+own hooks and uses HookRunner.Cli to receive Codex events and run one hook in
+an isolated child process. See the [consumer guide](docs/consumer.md).
 
 See [contribution instructions](CONTRIBUTING.md), [CI documentation](docs/ci.md),
 and [architecture decisions](docs/adr/).
+
+The [technical documentation](docs/technical/README.md) describes the source
+layout and current implementation. Method contracts are documented directly
+in the C# sources with XML comments.
 
 See [Architecture de HookRunner](docs/architecture.md) for the complete project
 design, business rules, execution contracts, configuration, and validation

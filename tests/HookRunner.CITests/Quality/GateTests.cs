@@ -89,6 +89,50 @@ public sealed class GateTests
         Assert.Equal("passed", result.Status);
     }
 
+    /// <summary>Vérifie la comparaison des chemins PDB déterministes avec les chemins locaux de Coverlet.</summary>
+    /// <param name="root">Racine du dépôt sur un système pris en charge.</param>
+    /// <param name="document">Chemin local émis par Coverlet pour le même document.</param>
+    [Theory]
+    [InlineData("/home/runner/work/HookRunner.Net/HookRunner.Net", "/home/runner/work/HookRunner.Net/HookRunner.Net/src/source.cs")]
+    [InlineData("D:\\a\\HookRunner.Net\\HookRunner.Net", "D:\\a\\HookRunner.Net\\HookRunner.Net\\src\\source.cs")]
+    [InlineData("/Users/runner/work/HookRunner.Net/HookRunner.Net", "/Users/runner/work/HookRunner.Net/HookRunner.Net/src/source.cs")]
+    public void DeterministicPdbPathsMatchLocalCoverageDocuments(string root, string document)
+    {
+        using JsonDocument report = MakeReport("Example", 1, 1, document);
+        Dictionary<string, HashSet<string>> expected = new() { ["/_/src/source.cs"] = ["10"] };
+        CoverageResult result = CoverageGate.Evaluate("Example", expected, [report.RootElement], root);
+        Assert.Equal("passed", result.Status);
+        Assert.Empty(result.UncoveredLines);
+        Assert.Empty(result.UncoveredBranches);
+    }
+
+    /// <summary>Vérifie que la résolution des chemins conserve les échecs de lignes et de branches manquées.</summary>
+    /// <param name="lineHits">Nombre d'exécutions de la ligne.</param>
+    /// <param name="branchHits">Nombre d'exécutions de la branche.</param>
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    public void DeterministicPathsDoNotHideUncoveredCode(int lineHits, int branchHits)
+    {
+        using JsonDocument report = MakeReport("Example", lineHits, branchHits, "/checkout/src/source.cs");
+        Dictionary<string, HashSet<string>> expected = new() { ["/_/src/source.cs"] = ["10"] };
+        CoverageResult result = CoverageGate.Evaluate("Example", expected, [report.RootElement], "/checkout");
+        Assert.Equal("failed", result.Status);
+        Assert.Equal(lineHits == 0 ? 1 : 0, result.UncoveredLines.Length);
+        Assert.Equal(branchHits == 0 ? 1 : 0, result.UncoveredBranches.Length);
+    }
+
+    /// <summary>Vérifie qu'un fichier homonyme dans un autre dossier ne couvre pas un document absent.</summary>
+    [Fact]
+    public void DeterministicPathsDoNotMatchDocumentsBySuffix()
+    {
+        using JsonDocument report = MakeReport("Example", 1, 1, "/other/src/source.cs");
+        Dictionary<string, HashSet<string>> expected = new() { ["/_/src/source.cs"] = ["10"] };
+        CoverageResult result = CoverageGate.Evaluate("Example", expected, [report.RootElement], "/checkout");
+        Assert.Equal("failed", result.Status);
+        Assert.Single(result.UncoveredLines);
+    }
+
     /// <summary>Vérifie le filtrage des sévérités sur les dépendances NuGet directes et transitives.</summary>
     /// <param name="severity">Sévérité de la vulnérabilité simulée.</param>
     /// <param name="group">Groupe NuGet topLevelPackages ou transitivePackages.</param>
@@ -143,8 +187,9 @@ public sealed class GateTests
     /// <param name="assembly">Nom du module à inscrire dans le rapport.</param>
     /// <param name="lineHits">Nombre d'exécutions de la ligne 10.</param>
     /// <param name="branchHits">Nombre d'exécutions de la branche à l'offset 0.</param>
+    /// <param name="document">Chemin du document source émis par Coverlet.</param>
     /// <returns>Un document JSON dont l'appelant doit assurer la libération.</returns>
-    private static JsonDocument MakeReport(string assembly, int lineHits, int branchHits)
+    private static JsonDocument MakeReport(string assembly, int lineHits, int branchHits, string document = "/source.cs")
     {
         object method = new
         {
@@ -153,7 +198,7 @@ public sealed class GateTests
         };
         Dictionary<string, object> methods = new() { ["Method()"] = method };
         Dictionary<string, object> types = new() { ["Example.Type"] = methods };
-        Dictionary<string, object> documents = new() { ["/source.cs"] = types };
+        Dictionary<string, object> documents = new() { [document] = types };
         return JsonDocument.Parse(JsonSerializer.Serialize(new Dictionary<string, object> { [assembly + ".dll"] = documents }));
     }
 }

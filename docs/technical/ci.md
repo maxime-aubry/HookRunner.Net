@@ -24,6 +24,9 @@ excluant les points cachés et les sources sous `obj/`. `Evaluate` fusionne
 les exécutions observées par toutes les suites et les compare à cet inventaire
 indépendant : l'absence d'un document dans le collecteur ne peut pas masquer
 une ligne à couvrir. Les branches des rapports participent aussi au verdict.
+La racine déterministe `/_/` des PDB de CI est résolue dans la racine locale
+du dépôt avant comparaison avec les chemins JSON Coverlet. Les noms de fichiers
+ou suffixes seuls ne suffisent jamais à identifier un document.
 
 [CoverageResult](../../tools/HookRunner.CI/Quality/Coverage/CoverageResult.cs)
 expose l'assembly, le statut et les points manquants. Un inventaire vide donne

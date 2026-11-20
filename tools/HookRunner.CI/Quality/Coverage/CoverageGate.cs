@@ -63,6 +63,7 @@ public static class CoverageGate
     /// <param name="reports">
     /// Rapports Coverlet JSON de toutes les suites ; ils sont lus sans être modifiés.
     /// </param>
+    /// <param name="repositoryRoot">Racine locale du dépôt pour résoudre les chemins PDB déterministes /_/.</param>
     /// <returns>
     /// Un résultat not-applicable pour un inventaire vide, passed si toutes les lignes et branches sont couvertes,
     /// sinon failed avec les points manquants.
@@ -72,7 +73,7 @@ public static class CoverageGate
     /// échoue dès qu'il contient des lignes attendues. Les documents et branches des rapports participent aussi au
     /// contrôle.
     /// </remarks>
-    public static CoverageResult Evaluate(string assembly, Dictionary<string, HashSet<string>> expected, IEnumerable<JsonElement> reports)
+    public static CoverageResult Evaluate(string assembly, Dictionary<string, HashSet<string>> expected, IEnumerable<JsonElement> reports, string? repositoryRoot = null)
     {
         if (expected.Count == 0)
         {
@@ -94,7 +95,7 @@ public static class CoverageGate
                 found = true;
                 foreach (JsonProperty document in module.Value.EnumerateObject())
                 {
-                    string file = document.Name.Replace('\\', '/');
+                    string file = ResolveSourcePath(document.Name, repositoryRoot);
                     foreach (JsonProperty type in document.Value.EnumerateObject())
                     {
                         foreach (JsonProperty method in type.Value.EnumerateObject())
@@ -121,7 +122,7 @@ public static class CoverageGate
         {
             foreach (string line in fileLines)
             {
-                lines.TryAdd(file + ":" + line, false);
+                lines.TryAdd(ResolveSourcePath(file, repositoryRoot) + ":" + line, false);
             }
         }
 
@@ -129,5 +130,17 @@ public static class CoverageGate
         string[] uncoveredBranches = [.. branches.Where(pair => !pair.Value).Select(pair => pair.Key).Order()];
         string status = found && uncoveredLines.Length == 0 && uncoveredBranches.Length == 0 ? "passed" : "failed";
         return new(assembly, status, uncoveredLines, uncoveredBranches);
+    }
+
+    /// <summary>Résout la racine virtuelle du PDB dans le dépôt local utilisé par les rapports Coverlet JSON.</summary>
+    /// <param name="file">Chemin source local ou déterministe.</param>
+    /// <param name="repositoryRoot">Racine locale du dépôt, ou null pour conserver les chemins déterministes.</param>
+    /// <returns>Un chemin avec barres obliques, sans rapprochement par nom de fichier ou suffixe.</returns>
+    private static string ResolveSourcePath(string file, string? repositoryRoot)
+    {
+        string normalized = file.Replace('\\', '/');
+        return repositoryRoot is not null && normalized.StartsWith("/_/", StringComparison.Ordinal)
+            ? repositoryRoot.Replace('\\', '/').TrimEnd('/') + "/" + normalized[3..]
+            : normalized;
     }
 }

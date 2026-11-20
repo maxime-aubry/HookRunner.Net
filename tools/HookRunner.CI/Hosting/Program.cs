@@ -80,7 +80,7 @@ internal static class Program
                 throw new FileNotFoundException("Production assembly missing", inventory[2]);
             }
 
-            results.Add(CoverageGate.Evaluate(inventory[1], CoverageGate.ReadSequencePoints(inventory[3]), reports));
+            results.Add(CoverageGate.Evaluate(inventory[1], CoverageGate.ReadSequencePoints(inventory[3]), reports, root));
         }
 
         string json = JsonSerializer.Serialize(results, JsonOptions);

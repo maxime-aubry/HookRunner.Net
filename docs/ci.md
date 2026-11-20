@@ -77,7 +77,10 @@ visible PDB sequence points. A measurable assembly or source document missing
 from reports fails. Percentages are not rounded to determine success, and a
 global average cannot compensate for an uncovered assembly. Gate regression
 tests cover missing assemblies/documents, independent branch failure, and
-merging suite results. A missing or malformed collector report fails.
+merging suite results. The gate resolves the deterministic PDB root `/_/`
+against the checkout root before comparing it with local Coverlet JSON paths;
+documents are never matched by filename or suffix. A missing or malformed
+collector report fails.
 
 Domain currently contains no business code. A library without coverable
 sequence points is explicitly `not-applicable`, never claimed as tested at
@@ -114,6 +117,8 @@ The architecture probes introduce an unused Cli-to-Domain
 project reference and a compiled dependency on Cli, verifying both dependency
 checks independently. A separate probe changes Cli to an executable to verify
 that its class-library constraint is enforced.
+Production probe types and members include XML documentation so compilation
+reaches the intended analyzer, architecture, or coverage check.
 
 For dependency changes, update central versions, run `dotnet restore` without
 locked mode to regenerate locks, review lock diffs, then run full validation.

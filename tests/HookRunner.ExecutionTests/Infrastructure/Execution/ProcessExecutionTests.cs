@@ -9,6 +9,50 @@ namespace HookRunner.ExecutionTests;
 /// <summary>Scénarios d'intégration du cas d'usage avec des processus enfants réels et contrôlés.</summary>
 public sealed class ProcessExecutionTests
 {
+    /// <summary>Le budget de démarrage est conservé et l'échéance arrête un hook C# ignorant toute annulation.</summary>
+    /// <returns>Le code 0 une fois la mort de l'enfant confirmée.</returns>
+    [Fact]
+    public async Task GlobalTimeoutForciblyTerminatesANonCooperatingChild()
+    {
+        using SolutionFixture fixture = new();
+        ManualTimeProvider clock = new();
+        ChildProcessCommand command = ConsumerProgram.Command;
+        command = command with { Arguments = [.. command.Arguments, "--test-mode", "uncooperative-wait", ""] };
+        using StringWriter diagnostics = new();
+        using CancellationTokenSource cleanup = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using CancellationTokenSource watchdog = new(TimeSpan.FromSeconds(30));
+        Context context = new(new ProcessHookExecutor(command), diagnostics, clock);
+        context.SetStrategy(new ConsumerStrategy("inspect"), WithOutput(fixture),
+            new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        string output = Path.Combine(fixture.Root, "observation.json");
+
+        Task<int> execution = context.ExecuteAsync(cleanup.Token);
+        try
+        {
+            clock.Advance(TimeSpan.FromSeconds(119));
+            while (!File.Exists(output) && !execution.IsCompleted)
+            {
+                await Task.Delay(20, watchdog.Token);
+            }
+
+            Assert.True(File.Exists(output), diagnostics.ToString());
+            int childId = int.Parse(await File.ReadAllTextAsync(output, watchdog.Token), CultureInfo.InvariantCulture);
+            Assert.False(execution.IsCompleted);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            int exit = await execution.WaitAsync(TimeSpan.FromSeconds(10), watchdog.Token);
+
+            Assert.Equal(0, exit);
+            Assert.Contains("timed out", diagnostics.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain("succeeded", diagnostics.ToString(), StringComparison.Ordinal);
+            Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
+        }
+        finally
+        {
+            cleanup.Cancel();
+            await execution.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+        }
+    }
+
     /// <summary>
     /// Vérifie via le cas d'usage les codes et diagnostics d'un véritable enfant pour chaque statut ou panne de
     /// protocole.

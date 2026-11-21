@@ -103,7 +103,7 @@ public sealed class CliTests
         yield return new(["execute", "hook", "--agent", "claude"]);
         yield return new(["execute", "hook", "--agent", "codex", "--agent", "codex"]);
         yield return new(["execute", "hook", "--agent", "codex", "--unknown", "value"]);
-        foreach (string timeout in new[] { "0", "-1", "1.5", "text", "2147483648" })
+        foreach (string timeout in new[] { "", "0", "-1", "+1", " 1", "1 ", "1.5", "1e2", "text", "2147483648" })
         {
             yield return new(["execute", "hook", "--agent", "codex", "--timeout", timeout]);
         }
@@ -128,23 +128,40 @@ public sealed class CliTests
     /// Vérifie le chargement de la configuration du programme compilé, la surcharge du timeout et la propagation
     /// du code applicatif.
     /// </summary>
+    /// <param name="configuredTimeout">Valeur configurée, ou null pour le défaut de 120 secondes.</param>
+    /// <param name="commandTimeout">Surcharge de commande facultative.</param>
+    /// <param name="expectedTimeout">Budget effectif attendu dans les options de l'enfant.</param>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
-    [Fact]
-    public async Task ConfigurationIsLoadedFromTheCompiledProgramAndTheResponseIsPropagated()
+    [Theory]
+    [InlineData(null, null, 120)]
+    [InlineData(37, null, 37)]
+    [InlineData(37, "19", 19)]
+    [InlineData(null, "1", 1)]
+    [InlineData(null, "2147483647", int.MaxValue)]
+    public async Task ConfigurationIsLoadedFromTheCompiledProgramAndTheResponseIsPropagated(
+        int? configuredTimeout, string? commandTimeout, int expectedTimeout)
     {
         using SolutionFixture fixture = new();
         using ConsoleCapture console = new(EventJson(fixture.Root));
-        using ConfigurationFile configuration = new("{\"HookRunner\":{\"StateFilePath\":\"Hooks/state.json\"}}");
+        string timeoutSetting = configuredTimeout.HasValue
+            ? $",\"TimeoutSeconds\":{configuredTimeout.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+            : string.Empty;
+        using ConfigurationFile configuration = new($"{{\"HookRunner\":{{\"StateFilePath\":\"Hooks/state.json\"{timeoutSetting}}}}}");
         CapturingExecutor executor = new();
+        string[] arguments = ["execute", "hook", "--agent", "codex"];
+        if (commandTimeout is not null)
+        {
+            arguments = [.. arguments, "--timeout", commandTimeout];
+        }
 
-        int exit = await HookRunnerHost.RunAsync(["execute", "hook", "--agent", "codex", "--timeout", "19"], services =>
+        int exit = await HookRunnerHost.RunAsync(arguments, services =>
         {
             services.AddSingleton<HookStrategy>(new ConsumerHook());
             services.AddSingleton<IIsolatedHookExecutor>(executor);
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exit);
-        Assert.Equal(19, executor.Request!.Options.TimeoutSeconds);
+        Assert.Equal(expectedTimeout, executor.Request!.Options.TimeoutSeconds);
         Assert.Equal(fixture.Root, executor.Request.Options.SolutionRoot);
     }
 

@@ -61,6 +61,7 @@ public sealed class ProcessHookExecutor(ChildProcessCommand command) : IIsolated
             start.ArgumentList.Add(ChildHookProtocol.Command);
             start.ArgumentList.Add(inputPath);
             start.ArgumentList.Add(resultPath);
+            cancellationToken.ThrowIfCancellationRequested();
             using Process process = Process.Start(start)!;
             process.StandardInput.Close();
             Task output = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
@@ -74,8 +75,8 @@ public sealed class ProcessHookExecutor(ChildProcessCommand command) : IIsolated
             {
                 if (!process.HasExited)
                 {
-                    process.Kill(entireProcessTree: true);
                     using CancellationTokenSource termination = new(TimeSpan.FromSeconds(5));
+                    process.Kill(entireProcessTree: true);
                     await process.WaitForExitAsync(termination.Token).ConfigureAwait(false);
                 }
             }

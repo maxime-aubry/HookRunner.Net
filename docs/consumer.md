@@ -94,12 +94,21 @@ Hosts needing another launcher can supply a `ChildProcessCommand` to
 entry modes must call the same composition callback. HookRunner appends its
 internal child arguments; these are separate from native Codex commands.
 
-This milestone implements the Codex execution path in issue #6. The following
-capabilities remain in their own tickets: global timeout enforcement (#7),
+The global timeout defaults to 120 seconds, is configurable through
+`HookRunner:TimeoutSeconds`, and can be overridden with `--timeout <seconds>`.
+Only strictly positive integers up to `2147483647` are accepted. One budget
+covers child startup and all hook execution. At the deadline, HookRunner
+forcibly stops the child process tree even if the hook ignores cancellation,
+then allows up to five seconds to confirm local termination. Confirmed timeout
+emits a trace and returns `0`; failed confirmation or external cancellation
+emits a diagnostic and returns `2`. Late hook results are ignored. Forced stop
+does not guarantee hook cleanup or roll back file changes.
+
+This milestone implements the Codex execution path (#6) and global timeout (#7).
+The following capabilities remain in their own tickets:
 business validation and persistent counters (#8), concurrent state (#9),
 project selection (#10), Claude events (#11), local commands (#12), and prompts
-(#13–#14). `--projects` is rejected until project selection is implemented;
-the prepared timeout is transmitted but is not yet an enforced execution budget.
+(#13–#14). `--projects` is rejected until project selection is implemented.
 
 `fixtures/HookRunner.TestHost` is a deterministic test consumer, not a production
 hook library. After a Release build, run

@@ -22,8 +22,8 @@ public sealed class InspectHook(ConsumerDependency dependency) : HookStrategy
     /// </param>
     /// <returns>Une tâche écrivant l'observation JSON au chemin observation_path de l'événement.</returns>
     /// <remarks>
-    /// HOOKRUNNER_TEST_MODE peut demander une attente annulable avec publication du PID, une sortie immédiate 23
-    /// ou une exception technique. Le parcours normal écrit aussi sur stdout pour vérifier son drainage par le
+    /// HOOKRUNNER_TEST_MODE peut demander une attente annulable ou un blocage C# ignorant l'annulation avec
+    /// publication du PID, une sortie immédiate 23 ou une exception technique. Le parcours normal écrit sur stdout pour vérifier son drainage par le
     /// superviseur.
     /// </remarks>
     /// <exception cref="InvalidOperationException">Le mode technical-failure simule une panne du hook.</exception>
@@ -31,11 +31,17 @@ public sealed class InspectHook(ConsumerDependency dependency) : HookStrategy
     {
         using JsonDocument document = JsonDocument.Parse(invocation.OriginalJson);
         string output = document.RootElement.GetProperty("observation_path").GetString()!;
-        if (Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE") == "wait")
+        string? mode = Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE");
+        if (mode is "wait" or "uncooperative-wait")
         {
             string ready = output + ".ready";
             await File.WriteAllTextAsync(ready, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
             File.Move(ready, output);
+            if (mode == "uncooperative-wait")
+            {
+                Thread.Sleep(Timeout.Infinite);
+            }
+
             await Task.Delay(Timeout.Infinite, cancellationToken);
         }
 

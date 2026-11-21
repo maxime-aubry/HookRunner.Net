@@ -60,7 +60,7 @@ La résolution effective des projets cibles n'est pas encore implémentée.
 
 | Propriété | Type | Signification et comportement actuel |
 | --- | --- | --- |
-| `TimeoutSeconds` | `int` | Timeout effectif, positif après préparation ; transmis sans déclencher de minuterie. |
+| `TimeoutSeconds` | `int` | Budget effectif positif, appliqué par Context au démarrage et à l'exécution du hook isolé. |
 | `SolutionRoot` | `string` | Premier dossier ascendant contenant une solution. |
 | `DefaultWorkingDirectory` | `string` | Dossier de lancement de l'enfant ; actuellement égal à `SolutionRoot`. |
 | `Projects` | `IReadOnlyList<TargetProject>` | Projets résolus ; liste vide dans le parcours superviseur actuel. |
@@ -191,12 +191,19 @@ lever une exception, ensuite traitée par `Context`. L'implémentation de
 production est [`ProcessHookExecutor`](infrastructure.md#processhookexecutor) ;
 les tests utilisent aussi des exécuteurs qui mémorisent la requête.
 
+L'annulation exige l'arrêt forcé sans grâce coopérative, puis sa confirmation
+dans un délai technique fini. Une `OperationCanceledException` portant le token
+reçu confirme l'arrêt ou l'absence de lancement. Une confirmation échouée lève
+une autre exception ; son propre token technique ne doit pas être confondu avec
+celui de l'exécution. Un résultat retourné garantit aussi la fin du hook isolé.
+
 ## Context
 
 [Source](../../src/HookRunner.Application/Hooks/Execution/Context.cs).
 
 Classe publique scellée, construite avec `IIsolatedHookExecutor executor` et
-`TextWriter diagnostics`. Elle conserve une requête privée nullable entre
+`TextWriter diagnostics`, avec un `TimeProvider` facultatif pour contrôler le
+temps (horloge système par défaut). Elle conserve une requête privée nullable entre
 `SetStrategy` et `ExecuteAsync`. Dans la composition par défaut, sa durée de
 vie DI est transitoire et les diagnostics sont dirigés vers `Console.Error`.
 
@@ -209,13 +216,25 @@ rien. Elle ne valide pas elle-même `invocation`, `options` ou le nom.
 
 ### ExecuteAsync(CancellationToken cancellationToken)
 
-Renvoie `Task<int>`. Exige une requête préparée puis délègue à l'exécuteur en
-lui transmettant le token. Pour `Success`, écrit `Hook '<nom>' succeeded.` et
-renvoie `0`. Pour tout autre statut, écrit le diagnostic et renvoie `2`.
+Renvoie `Task<int>`. Exige une requête préparée et refuse une annulation
+extérieure préalable avant tout lancement. Une seule échéance monotone démarre
+avant l'exécuteur : le démarrage de l'enfant et l'exécution partagent le budget
+de `HookOptions.TimeoutSeconds`. Son token est lié à l'annulation extérieure.
+À l'échéance, l'exécuteur force l'arrêt et en confirme la terminaison.
+
+Un timeout confirmé écrit uniquement une trace et renvoie `0`. Un verdict
+métier tardif est ignoré, même si le rappel de minuterie a été retardé.
+L'annulation extérieure et l'échec de confirmation donnent un diagnostic et `2`.
+Avant l'échéance, `Success` écrit `Hook '<nom>' succeeded.` et renvoie `0` ;
+les autres statuts écrivent leur diagnostic et renvoient `2`.
+
+[`InvocationDeadline`](../../src/HookRunner.Application/Hooks/Execution/InvocationDeadline.cs)
+conserve l'instant monotone de départ. Pour les grands entiers positifs, elle
+réarme une minuterie avec le budget restant sans renouveler l'échéance.
 
 Les exceptions, y compris l'absence de stratégie et l'annulation, sont
 interceptées : la méthode écrit `Hook execution failed: <message>` et renvoie
-`2`. Elle ne gère encore ni compteur, ni persistance, ni budget de timeout,
+`2`. Elle ne gère encore ni compteur, ni persistance,
 ni distinction de code entre validation et panne technique. Le writer doit
 rester utilisable : une exception lors de l'écriture dans le bloc `catch`
 peut encore remonter à l'appelant.

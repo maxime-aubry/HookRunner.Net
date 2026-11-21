@@ -9,8 +9,9 @@ privés restent proches des assertions qui les utilisent.
 | Source | Responsabilité |
 | --- | --- |
 | [Application/UseCaseTests](../../tests/HookRunner.ExecutionTests/Application/UseCaseTests.cs) | Sélection d'un seul hook, options, recherche ascendante et absence de lancement après erreur. Les stratégies sentinelles lèvent si le superviseur les appelle directement ; l'exécuteur mémorise la requête. |
+| [Application/TimeoutTests](../../tests/HookRunner.ExecutionTests/Application/TimeoutTests.cs) | Budget unique, confirmation, annulation extérieure, résultats tardifs et grands timeouts via Context, avec une horloge contrôlée sans attente réelle. |
 | [Infrastructure/Agents/Codex/InvocationTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Agents/Codex/InvocationTests.cs) | Champs natifs invalides, session, dossier et conservation exacte du JSON original. |
-| [Infrastructure/Execution/ProcessExecutionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Execution/ProcessExecutionTests.cs) | Enfant réel, résultats internes invalides, panne de lancement et terminaison sur annulation extérieure. |
+| [Infrastructure/Execution/ProcessExecutionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Execution/ProcessExecutionTests.cs) | Enfant réel, résultats internes invalides, panne de lancement, annulation extérieure et arrêt forcé sur timeout d'un hook ignorant l'annulation. |
 | [Cli/CliTests](../../tests/HookRunner.ExecutionTests/Cli/CliTests.cs) | Arguments, configuration, composition, libération asynchrone, transport enfant et données déjà préparées. |
 | [Integration/HostTests](../../tests/HookRunner.ExecutionTests/Integration/HostTests.cs) | Superviseur et enfant réels, scan des stratégies, dépendance consommateur, chargement depuis le programme compilé, flux et codes de sortie. |
 
@@ -19,6 +20,8 @@ créent une solution temporaire et localisent ou copient le consommateur
 compilé. `ConsumerProgram.CopyTo` remplace les assemblies HookRunner par
 celles sous test afin de conserver l'instrumentation de couverture.
 `SolutionFixture.Dispose` supprime uniquement sa propre solution temporaire.
+`ManualTimeProvider` avance l'horloge monotone et déclenche les minuteries
+explicitement ; il peut aussi simuler un retard d'ordonnancement du rappel.
 La collection `ConsoleTestsGroup` sérialise les scénarios qui modifient les
 flux standard et la configuration globale du programme de tests.
 
@@ -47,7 +50,8 @@ Le hook écrit une [Observation](../../fixtures/HookRunner.TestHost/Observations
 contenant son PID, les données reçues et la valeur de
 [ConsumerDependency](../../fixtures/HookRunner.TestHost/Services/ConsumerDependency.cs).
 
-Les modes contrôlés simulent attente, exception, sortie inattendue, doublon
+Les modes contrôlés simulent attente annulable, blocage C# ignorant l'annulation,
+exception, sortie inattendue, doublon
 de stratégie et résultat de protocole invalide. Ils ne nécessitent aucun
 appel à un modèle. La fixture sert aussi à la consommation des packages
 NuGet dans `scripts/test-consumer-packages.ps1`.

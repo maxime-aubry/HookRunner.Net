@@ -40,7 +40,11 @@ stdout et stderr sans les recopier dans les diagnostics du superviseur.
 Le dossier de travail provient des options préparées.
 
 Une attente interrompue entraîne l'arrêt de l'arbre de processus et une
-confirmation bornée à cinq secondes. Un code enfant non nul ou un résultat
+confirmation bornée à cinq secondes, avec un token technique distinct du
+token d'exécution. Il n'existe aucune grâce coopérative avant l'arrêt forcé.
+Le token global est revérifié immédiatement avant le lancement pour empêcher
+un démarrage après annulation pendant la préparation du transport.
+Un code enfant non nul ou un résultat
 absent provoque une erreur technique. La version, le statut et la présence
 d'un diagnostic pour les échecs sont vérifiés avant de rendre un résultat
 neutre à Application. Le dossier temporaire est supprimé dans `finally`.

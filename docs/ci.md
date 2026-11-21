@@ -16,6 +16,10 @@ links, and workflows. `Security` queries NuGet and runs the free Gitleaks CLI
 against Git history and the working tree with fully redacted reports.
 Each task stops on a failed native command; no `continue-on-error` is used.
 CI restores NuGet lock files in locked mode and caches packages by lock content.
+After the coverage gate, `scripts/test-consumer-packages.ps1` packs the four
+libraries and builds an independent console host with package references from
+a checkout-local feed. It executes a Codex invocation and its child process
+without an installed agent or model. This runs in every OS test job.
 
 Full build/test/coverage runs on Ubuntu 24.04 x64, Windows Server 2025 x64 and
 macOS 15 Arm64. These are representative supported systems, not evidence of
@@ -73,9 +77,12 @@ visible PDB sequence points. A measurable assembly or source document missing
 from reports fails. Percentages are not rounded to determine success, and a
 global average cannot compensate for an uncovered assembly. Gate regression
 tests cover missing assemblies/documents, independent branch failure, and
-merging suite results. A missing or malformed collector report fails.
+merging suite results. The gate resolves the deterministic PDB root `/_/`
+against the checkout root before comparing it with local Coverlet JSON paths;
+documents are never matched by filename or suffix. A missing or malformed
+collector report fails.
 
-The initial libraries contain no business code. A library without coverable
+Domain currently contains no business code. A library without coverable
 sequence points is explicitly `not-applicable`, never claimed as tested at
 100%. Raw Coverlet output may display 100% for an empty module and emit a
 no-hits warning; `gate.json` and `gate.md` provide the authoritative status.
@@ -110,6 +117,8 @@ The architecture probes introduce an unused Cli-to-Domain
 project reference and a compiled dependency on Cli, verifying both dependency
 checks independently. A separate probe changes Cli to an executable to verify
 that its class-library constraint is enforced.
+Production probe types and members include XML documentation so compilation
+reaches the intended analyzer, architecture, or coverage check.
 
 For dependency changes, update central versions, run `dotnet restore` without
 locked mode to regenerate locks, review lock diffs, then run full validation.
@@ -149,11 +158,12 @@ serverless scaffold; SDK analyzers run directly in CI.
 [SonarQube Community documentation](https://docs.sonarsource.com/sonarqube-community-build/).
 Gitleaks uses its free CLI, avoiding any Action-specific licensing dependency.
 
-NuGet packing, documentation-site builds, Pages deployment, integration services,
-and benchmarks are not applicable to this empty internal-library milestone.
-There is no distributed package, generated documentation site, external service
-or critical business operation. Add meaningful integration tests when a service
-appears. When a critical operation exists, use BenchmarkDotNet in a separate
+CI packs the four libraries into a local NuGet feed and builds an independent
+test consumer to verify package integration and isolated child execution.
+Documentation-site builds, Pages deployment, external integration services,
+and benchmarks are not configured for this milestone. There is no generated
+documentation site or external service. When a critical operation exists,
+use BenchmarkDotNet in a separate
 manual/scheduled workflow, retain results, and avoid timing gates on noisy
 shared runners. No public deployment or package publication is configured.
 

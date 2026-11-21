@@ -55,6 +55,9 @@ jobs:
       - name: Build, test, and enforce coverage
         shell: pwsh
         run: ./scripts/validate.ps1 -Task BuildTest -Locked
+      - name: Verify NuGet consumer and child execution
+        shell: pwsh
+        run: ./scripts/test-consumer-packages.ps1
       - name: Coverage summary
         if: always()
         shell: pwsh

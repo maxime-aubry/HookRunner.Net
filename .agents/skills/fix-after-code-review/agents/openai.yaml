@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fix after code review"
+  short_description: "Corriger les écarts en trois passes maximum"

@@ -2,10 +2,22 @@ using System.Text.Json;
 
 namespace HookRunner.CI;
 
+/// <summary>Point d'entrée du programme de contrôle CI.</summary>
 internal static class Program
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
+    /// <summary>
+    /// Route la commande CI vers le contrôle de couverture, d'audit ou de liens de documentation.
+    /// </summary>
+    /// <param name="args">coverage ou docs suivi de la racine du dépôt, ou audit suivi du rapport JSON.</param>
+    /// <returns>
+    /// 0 si le contrôle réussit, 1 s'il échoue ou rencontre une erreur de données prise en charge.
+    /// </returns>
+    /// <remarks>
+    /// Les erreurs attendues de lecture, format ou contrat sont écrites sur stderr. Les autres exceptions restent
+    /// visibles à l'hôte.
+    /// </remarks>
     private static int Main(string[] args)
     {
         try
@@ -25,6 +37,19 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Charge inventaires et rapports, évalue chaque projet de production et écrit les synthèses JSON et Markdown.
+    /// </summary>
+    /// <param name="root">Chemin absolu de la racine du dépôt contenant src et artifacts.</param>
+    /// <returns>1 si une assembly échoue au contrôle de couverture, sinon 0.</returns>
+    /// <remarks>
+    /// Les rapports sont lus sous artifacts/coverage et les inventaires sous artifacts/inventory. La synthèse JSON
+    /// est aussi écrite sur stdout.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Aucun projet de production n'est découvert.</exception>
+    /// <exception cref="FileNotFoundException">
+    /// Aucun rapport Coverlet n'existe ou une assembly attendue est absente.
+    /// </exception>
     private static int CheckCoverage(string root)
     {
         string artifacts = Path.Combine(root, "artifacts");
@@ -55,7 +80,7 @@ internal static class Program
                 throw new FileNotFoundException("Production assembly missing", inventory[2]);
             }
 
-            results.Add(CoverageGate.Evaluate(inventory[1], CoverageGate.ReadSequencePoints(inventory[3]), reports));
+            results.Add(CoverageGate.Evaluate(inventory[1], CoverageGate.ReadSequencePoints(inventory[3]), reports, root));
         }
 
         string json = JsonSerializer.Serialize(results, JsonOptions);
@@ -66,6 +91,10 @@ internal static class Program
         return results.Any(result => result.Status == "failed") ? 1 : 0;
     }
 
+    /// <summary>Lit le rapport d'audit NuGet et écrit les vulnérabilités bloquantes sur stderr.</summary>
+    /// <param name="path">Chemin du rapport JSON produit par NuGet.</param>
+    /// <returns>0 en l'absence de vulnérabilité bloquante ; sinon 1.</returns>
+    /// <remarks>Les erreurs de lecture ou de structure du rapport se propagent au routeur de commandes.</remarks>
     private static int CheckAudit(string path)
     {
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
@@ -78,6 +107,20 @@ internal static class Program
         return vulnerabilities.Length == 0 ? 0 : 1;
     }
 
+    /// <summary>
+    /// Vérifie l'existence des cibles locales des liens Markdown de la racine et du dossier docs.
+    /// </summary>
+    /// <param name="root">Chemin absolu de la racine du dépôt.</param>
+    /// <returns>
+    /// 0 après vérification de tous les liens locaux et écriture du nombre de fichiers contrôlés sur stdout.
+    /// </returns>
+    /// <remarks>
+    /// Les fragments d'ancre sont retirés ; les liens absolus et externes sont ignorés. Les cibles sont décodées
+    /// puis résolues relativement au fichier Markdown. Ce contrôle ne valide pas les ancres ni le contenu.
+    /// </remarks>
+    /// <exception cref="FileNotFoundException">
+    /// Une cible locale de lien n'existe ni comme fichier ni comme dossier.
+    /// </exception>
     private static int CheckDocumentation(string root)
     {
         List<string> files = [.. Directory.GetFiles(Path.Combine(root, "docs"), "*.md", SearchOption.AllDirectories)];

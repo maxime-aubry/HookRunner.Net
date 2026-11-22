@@ -9,6 +9,8 @@ namespace HookRunner.Application;
 public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnostics, TimeProvider? timeProvider = null)
 {
     private IsolatedHookRequest? request;
+    private readonly InvocationSupervisor supervisor = new(executor, timeProvider ?? TimeProvider.System);
+    private readonly ExecutionReporter reporter = new(diagnostics);
 
     /// <summary>
     /// Prépare l'exécution isolée de la stratégie sélectionnée en remplaçant la requête du contexte.
@@ -42,65 +44,18 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
     {
         try
         {
-            IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
-            cancellationToken.ThrowIfCancellationRequested();
-            int exitCode;
-            await using (InvocationDeadline deadline = new(execution.Options.TimeoutSeconds, timeProvider ?? TimeProvider.System))
-            {
-                exitCode = await ExecuteIsolatedAsync(execution, deadline, cancellationToken).ConfigureAwait(false);
-            }
-
-            return exitCode;
+            return await ExecutePreparedAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            diagnostics.WriteLine($"Hook execution failed: {exception.Message}");
-            return 2;
+            return reporter.ReportFailure(exception);
         }
     }
 
-    /// <summary>Attend le hook et traduit son résultat sans renouveler l'échéance de supervision.</summary>
-    /// <param name="execution">Requête préparée à transmettre à l'enfant.</param>
-    /// <param name="deadline">Échéance unique déjà démarrée.</param>
-    /// <param name="cancellationToken">Annulation extérieure, prioritaire sur le timeout.</param>
-    /// <returns>Le code 0 ou 2 après interprétation du résultat ou de l'arrêt confirmé.</returns>
-    private async Task<int> ExecuteIsolatedAsync(IsolatedHookRequest execution, InvocationDeadline deadline, CancellationToken cancellationToken)
+    private async Task<int> ExecutePreparedAsync(CancellationToken cancellationToken)
     {
-        using CancellationTokenSource executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        HookExecutionResult result;
-        try
-        {
-            result = await executor.ExecuteAsync(execution, executionCancellation.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException exception) when (
-            deadline.IsExpired && !cancellationToken.IsCancellationRequested
-            && exception.CancellationToken == executionCancellation.Token)
-        {
-            return TraceTimeout(execution);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        if (deadline.IsExpired)
-        {
-            return TraceTimeout(execution);
-        }
-
-        if (result.Status == HookExecutionStatus.Success)
-        {
-            diagnostics.WriteLine($"Hook '{execution.HookName}' succeeded.");
-            return 0;
-        }
-
-        diagnostics.WriteLine(result.Diagnostic);
-        return 2;
-    }
-
-    /// <summary>Émet uniquement la trace d'un timeout dont l'arrêt a été confirmé par l'exécuteur.</summary>
-    /// <param name="execution">Invocation dont le résultat métier doit être ignoré.</param>
-    /// <returns>Le code 0 autorisant la poursuite sans succès métier implicite.</returns>
-    private int TraceTimeout(IsolatedHookRequest execution)
-    {
-        diagnostics.WriteLine($"Hook '{execution.HookName}' timed out after {execution.Options.TimeoutSeconds} seconds; termination confirmed.");
-        return 0;
+        IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
+        HookExecutionResult? result = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
+        return reporter.Report(execution, result);
     }
 }

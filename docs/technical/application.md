@@ -216,6 +216,12 @@ rien. Elle ne valide pas elle-même `invocation`, `options` ou le nom.
 
 ### ExecuteAsync(CancellationToken cancellationToken)
 
+`Context` délègue la gestion du budget et des tokens à
+[InvocationSupervisor](../../src/HookRunner.Application/Hooks/Execution/InvocationSupervisor.cs).
+[ExecutionReporter](../../src/HookRunner.Application/Hooks/Execution/ExecutionReporter.cs)
+traduit ensuite le résultat supervisé en diagnostic et code de sortie.
+Ces modules restent internes ; les contrats publics du contexte sont conservés.
+
 Renvoie `Task<int>`. Exige une requête préparée et refuse une annulation
 extérieure préalable avant tout lancement. Une seule échéance monotone démarre
 avant l'exécuteur : le démarrage de l'enfant et l'exécution partagent le budget

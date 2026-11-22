@@ -1,4 +1,3 @@
-using System.Reflection.Metadata;
 using System.Text.Json;
 
 namespace HookRunner.CI;
@@ -22,38 +21,7 @@ public static class CoverageGate
     /// </exception>
     /// <exception cref="IOException">Le PDB ne peut pas être ouvert ou lu.</exception>
     public static Dictionary<string, HashSet<string>> ReadSequencePoints(string pdbPath)
-    {
-        using FileStream stream = File.OpenRead(pdbPath);
-        using MetadataReaderProvider provider = MetadataReaderProvider.FromPortablePdbStream(stream);
-        MetadataReader reader = provider.GetMetadataReader();
-        Dictionary<string, HashSet<string>> lines = [with(StringComparer.Ordinal)];
-        foreach (MethodDebugInformationHandle method in reader.MethodDebugInformation)
-        {
-            foreach (SequencePoint point in reader.GetMethodDebugInformation(method).GetSequencePoints())
-            {
-                if (point.IsHidden || point.Document.IsNil)
-                {
-                    continue;
-                }
-
-                string file = reader.GetString(reader.GetDocument(point.Document).Name).Replace('\\', '/');
-                if (file.Contains("/obj/", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (!lines.TryGetValue(file, out HashSet<string>? fileLines))
-                {
-                    fileLines = [];
-                    lines.Add(file, fileLines);
-                }
-
-                fileLines.Add(point.StartLine.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            }
-        }
-
-        return lines;
-    }
+        => PdbSequencePointReader.Read(pdbPath);
 
     /// <summary>
     /// Fusionne les rapports de couverture d'une assembly et les confronte à l'inventaire indépendant du PDB.
@@ -80,67 +48,24 @@ public static class CoverageGate
             return new(assembly, "not-applicable", [], []);
         }
 
-        Dictionary<string, bool> lines = [with(StringComparer.Ordinal)];
-        Dictionary<string, bool> branches = [with(StringComparer.Ordinal)];
-        bool found = false;
-        foreach (JsonElement report in reports)
-        {
-            foreach (JsonProperty module in report.EnumerateObject())
-            {
-                if (!string.Equals(Path.GetFileNameWithoutExtension(module.Name.Replace('\\', '/')), assembly, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                found = true;
-                foreach (JsonProperty document in module.Value.EnumerateObject())
-                {
-                    string file = ResolveSourcePath(document.Name, repositoryRoot);
-                    foreach (JsonProperty type in document.Value.EnumerateObject())
-                    {
-                        foreach (JsonProperty method in type.Value.EnumerateObject())
-                        {
-                            foreach (JsonProperty line in method.Value.GetProperty("Lines").EnumerateObject())
-                            {
-                                string key = file + ":" + line.Name;
-                                lines[key] = lines.GetValueOrDefault(key) || line.Value.GetInt32() > 0;
-                            }
-
-                            foreach (JsonElement branch in method.Value.GetProperty("Branches").EnumerateArray())
-                            {
-                                string key = $"{file}:{branch.GetProperty("Line")}: {method.Name} offset {branch.GetProperty("Offset")} path {branch.GetProperty("Path")}";
-                                branches[key] = branches.GetValueOrDefault(key) || branch.GetProperty("Hits").GetInt32() > 0;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check the PDB independently: an assembly or document omitted by the collector must fail.
-        foreach ((string file, HashSet<string> fileLines) in expected)
-        {
-            foreach (string line in fileLines)
-            {
-                lines.TryAdd(ResolveSourcePath(file, repositoryRoot) + ":" + line, false);
-            }
-        }
-
-        string[] uncoveredLines = [.. lines.Where(pair => !pair.Value).Select(pair => pair.Key).Order()];
-        string[] uncoveredBranches = [.. branches.Where(pair => !pair.Value).Select(pair => pair.Key).Order()];
-        string status = found && uncoveredLines.Length == 0 && uncoveredBranches.Length == 0 ? "passed" : "failed";
+        CoverageSnapshot coverage = CoverletCoverageReader.Read(assembly, reports, repositoryRoot);
+        IncludeExpectedLines(coverage, expected, repositoryRoot);
+        string[] uncoveredLines = [.. coverage.Lines.Where(pair => !pair.Value).Select(pair => pair.Key.ToString()).Order()];
+        string[] uncoveredBranches = [.. coverage.Branches.Where(pair => !pair.Value).Select(pair => pair.Key.ToString()).Order()];
+        string status = coverage.Found && uncoveredLines.Length == 0 && uncoveredBranches.Length == 0 ? "passed" : "failed";
         return new(assembly, status, uncoveredLines, uncoveredBranches);
     }
 
-    /// <summary>Résout la racine virtuelle du PDB dans le dépôt local utilisé par les rapports Coverlet JSON.</summary>
-    /// <param name="file">Chemin source local ou déterministe.</param>
-    /// <param name="repositoryRoot">Racine locale du dépôt, ou null pour conserver les chemins déterministes.</param>
-    /// <returns>Un chemin avec barres obliques, sans rapprochement par nom de fichier ou suffixe.</returns>
-    private static string ResolveSourcePath(string file, string? repositoryRoot)
+    private static void IncludeExpectedLines(CoverageSnapshot coverage, Dictionary<string, HashSet<string>> expected, string? repositoryRoot)
     {
-        string normalized = file.Replace('\\', '/');
-        return repositoryRoot is not null && normalized.StartsWith("/_/", StringComparison.Ordinal)
-            ? repositoryRoot.Replace('\\', '/').TrimEnd('/') + "/" + normalized[3..]
-            : normalized;
+        // The independent PDB inventory detects documents omitted by the collector.
+        foreach ((string file, HashSet<string> fileLines) in expected)
+        {
+            string resolved = CoverageSourcePath.Resolve(file, repositoryRoot);
+            foreach (string line in fileLines)
+            {
+                coverage.Lines.TryAdd(new SourceLine(resolved, line), false);
+            }
+        }
     }
 }

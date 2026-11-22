@@ -43,15 +43,22 @@ internal static class ConsumerProgram
     {
         get
         {
-            DirectoryInfo? repository = new(AppContext.BaseDirectory);
-            while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "HookRunner.slnx")))
-            {
-                repository = repository.Parent;
-            }
-
+            string repository = RepositoryRoot();
             string configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
-            string host = Path.Combine(repository!.FullName, "fixtures", "HookRunner.TestHost", "bin", configuration, "net11.0", "HookRunner.TestHost.dll");
+            string framework = new DirectoryInfo(AppContext.BaseDirectory).Name;
+            string host = Path.Combine(repository, "fixtures", "HookRunner.TestHost", "bin", configuration, framework, "HookRunner.TestHost.dll");
             return new ChildProcessCommand("dotnet", [host]);
         }
+    }
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "HookRunner.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Cannot locate HookRunner.slnx");
     }
 }

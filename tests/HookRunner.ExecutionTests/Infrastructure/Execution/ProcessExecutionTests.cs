@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text.Json;
 using HookRunner.Application;
 using HookRunner.Infrastructure;
@@ -19,38 +18,24 @@ public sealed class ProcessExecutionTests
         ChildProcessCommand command = ConsumerProgram.Command;
         command = command with { Arguments = [.. command.Arguments, "--test-mode", "uncooperative-wait", ""] };
         using StringWriter diagnostics = new();
-        using CancellationTokenSource cleanup = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         using CancellationTokenSource watchdog = new(TimeSpan.FromSeconds(30));
         Context context = new(new ProcessHookExecutor(command), diagnostics, clock);
         context.SetStrategy(new ConsumerStrategy("inspect"), WithOutput(fixture),
             new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
         string output = Path.Combine(fixture.Root, "observation.json");
 
-        Task<int> execution = context.ExecuteAsync(cleanup.Token);
-        try
-        {
-            clock.Advance(TimeSpan.FromSeconds(119));
-            while (!File.Exists(output) && !execution.IsCompleted)
-            {
-                await Task.Delay(20, watchdog.Token);
-            }
+        await using RunningInvocation<int> running = new(context.ExecuteAsync, TestContext.Current.CancellationToken);
+        Task<int> execution = running.Execution;
+        clock.Advance(TimeSpan.FromSeconds(119));
+        int childId = await ConsumerProcessObservation.WaitForProcessIdAsync(output, execution, watchdog.Token);
+        Assert.False(execution.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        int exit = await execution.WaitAsync(TimeSpan.FromSeconds(10), watchdog.Token);
 
-            Assert.True(File.Exists(output), diagnostics.ToString());
-            int childId = int.Parse(await File.ReadAllTextAsync(output, watchdog.Token), CultureInfo.InvariantCulture);
-            Assert.False(execution.IsCompleted);
-            clock.Advance(TimeSpan.FromSeconds(1));
-            int exit = await execution.WaitAsync(TimeSpan.FromSeconds(10), watchdog.Token);
-
-            Assert.Equal(0, exit);
-            Assert.Contains("timed out", diagnostics.ToString(), StringComparison.Ordinal);
-            Assert.DoesNotContain("succeeded", diagnostics.ToString(), StringComparison.Ordinal);
-            Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
-        }
-        finally
-        {
-            cleanup.Cancel();
-            await execution.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
-        }
+        Assert.Equal(0, exit);
+        Assert.Contains("timed out", diagnostics.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("succeeded", diagnostics.ToString(), StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
     }
 
     /// <summary>
@@ -70,6 +55,7 @@ public sealed class ProcessExecutionTests
     [InlineData("inspect", "invalid-result", "null", 2, "Invalid hook child result")]
     [InlineData("inspect", "invalid-result", "{}", 2, "Hook execution failed")]
     [InlineData("inspect", "invalid-result", "{\"Version\":1}", 2, "Hook execution failed")]
+    [InlineData("inspect", "invalid-result", "{\"Version\":2,\"Status\":0}", 2, "Invalid hook child result")]
     [InlineData("inspect", "invalid-result", "{\"Version\":1,\"Status\":99}", 2, "Invalid hook child result")]
     [InlineData("inspect", "invalid-result", "{\"Version\":1,\"Status\":2}", 2, "Invalid hook child result")]
     [InlineData("inspect", "invalid-result", "{\"Version\":1,\"Status\":2,\"Diagnostic\":\"technical detail\"}", 2, "technical detail")]
@@ -125,34 +111,21 @@ public sealed class ProcessExecutionTests
         ChildProcessCommand command = ConsumerProgram.Command;
         command = command with { Arguments = [.. command.Arguments, "--test-mode", "wait", ""] };
         using StringWriter diagnostics = new();
-        using CancellationTokenSource cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
         RunHookUseCase useCase = new([new ConsumerStrategy("inspect")], new HookOptionsPreparer(120, "Hooks/state.json"),
             new Context(new ProcessHookExecutor(command), diagnostics));
         string output = Path.Combine(fixture.Root, "observation.json");
 
-        Task<RunHookResponse> execution = useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("inspect", null, []), WithOutput(fixture)), cancellation.Token);
-        try
-        {
-            while (!File.Exists(output) && !execution.IsCompleted)
-            {
-                await Task.Delay(20, deadline.Token);
-            }
+        RunHookRequest request = new(new RunHookArgs("inspect", null, []), WithOutput(fixture));
+        await using RunningInvocation<RunHookResponse> running = new(token => useCase.ExecuteAsync(request, token), TestContext.Current.CancellationToken);
+        Task<RunHookResponse> execution = running.Execution;
+        int childId = await ConsumerProcessObservation.WaitForProcessIdAsync(output, execution, deadline.Token);
+        running.Cancel();
+        RunHookResponse response = await execution.WaitAsync(deadline.Token);
 
-            Assert.True(File.Exists(output), diagnostics.ToString());
-            int childId = int.Parse(await File.ReadAllTextAsync(output, deadline.Token), CultureInfo.InvariantCulture);
-            cancellation.Cancel();
-            RunHookResponse response = await execution.WaitAsync(deadline.Token);
-
-            Assert.Equal(2, response.ExitCode);
-            Assert.Contains("Hook execution failed", diagnostics.ToString(), StringComparison.Ordinal);
-            Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
-        }
-        finally
-        {
-            cancellation.Cancel();
-            await execution.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
-        }
+        Assert.Equal(2, response.ExitCode);
+        Assert.Contains("Hook execution failed", diagnostics.ToString(), StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => Process.GetProcessById(childId));
     }
 
     /// <summary>

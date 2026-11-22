@@ -37,24 +37,30 @@ public static class HookRunnerHost
         ChildProcessCommand? childProcess = null,
         CancellationToken cancellationToken = default)
     {
-        int exitCode;
         try
         {
-            ArgumentNullException.ThrowIfNull(args);
-            ArgumentNullException.ThrowIfNull(configureServices);
-            await using ServiceProvider provider = BuildServiceProvider(configureServices, childProcess);
-            bool isChildProcess = args.Length > 0 && args[0] == ChildHookProtocol.Command;
-            exitCode = isChildProcess
-                ? await ChildHookEntryPoint.RunAsync(args, provider, cancellationToken).ConfigureAwait(false)
-                : await RunSupervisorAsync(args, provider, cancellationToken).ConfigureAwait(false);
+            return await RunComposedAsync(args, configureServices, childProcess, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"HookRunner: {exception.Message}");
             return 2;
         }
+    }
 
-        return exitCode;
+    private static async Task<int> RunComposedAsync(
+        string[] args,
+        Action<IServiceCollection> configureServices,
+        ChildProcessCommand? childProcess,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(configureServices);
+        await using ServiceProvider provider = BuildServiceProvider(configureServices, childProcess);
+        bool isChildProcess = args.Length > 0 && args[0] == ChildHookProtocol.Command;
+        return isChildProcess
+            ? await ChildHookEntryPoint.RunAsync(args, provider, cancellationToken).ConfigureAwait(false)
+            : await RunSupervisorAsync(args, provider, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

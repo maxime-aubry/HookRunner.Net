@@ -66,16 +66,26 @@ internal static class ChildHookEntryPoint
     {
         try
         {
-            string requestJson = await File.ReadAllTextAsync(requestPath, cancellationToken).ConfigureAwait(false);
-            IsolatedHookRequest request = JsonSerializer.Deserialize<IsolatedHookRequest>(requestJson, RequestJsonOptions)
-                ?? throw new InvalidDataException("Invalid hook child request.");
-            HookStrategy strategy = HookSelection.Select(provider.GetServices<HookStrategy>(), request.HookName);
-            await strategy.ExecuteAsync(request.Invocation, request.Options, cancellationToken).ConfigureAwait(false);
+            await ExecuteRequestAsync(requestPath, provider, cancellationToken).ConfigureAwait(false);
             return new ChildHookResult(ChildHookProtocol.Version, HookExecutionStatus.Success, null);
         }
         catch (Exception exception)
         {
             return new ChildHookResult(ChildHookProtocol.Version, HookExecutionStatus.TechnicalFailure, exception.Message);
         }
+    }
+
+    private static async Task ExecuteRequestAsync(string requestPath, IServiceProvider provider, CancellationToken cancellationToken)
+    {
+        IsolatedHookRequest request = await ReadRequestAsync(requestPath, cancellationToken).ConfigureAwait(false);
+        HookStrategy strategy = HookSelection.Select(provider.GetServices<HookStrategy>(), request.HookName);
+        await strategy.ExecuteAsync(request.Invocation, request.Options, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<IsolatedHookRequest> ReadRequestAsync(string requestPath, CancellationToken cancellationToken)
+    {
+        string json = await File.ReadAllTextAsync(requestPath, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Deserialize<IsolatedHookRequest>(json, RequestJsonOptions)
+            ?? throw new InvalidDataException("Invalid hook child request.");
     }
 }

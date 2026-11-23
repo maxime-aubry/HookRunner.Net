@@ -3,6 +3,8 @@ namespace HookRunner.CITests;
 /// <summary>Vérifie les erreurs de données à travers les commandes publiques du programme CI.</summary>
 public sealed class CommandTests
 {
+    /// <summary>Vérifie qu'un inventaire de production incomplet donne le code 1 et un diagnostic pris en charge.</summary>
+    /// <returns>Une tâche représentant l'exécution de la commande CI et ses assertions.</returns>
     [Fact]
     public async Task MalformedProductionInventoryReturnsOneWithDiagnostic()
     {
@@ -18,6 +20,10 @@ public sealed class CommandTests
         Assert.DoesNotContain("Unhandled exception", error, StringComparison.Ordinal);
     }
 
+    /// <summary>Vérifie qu'un rapport d'audit incompatible, vide ou en erreur donne le code 1 sans exception non gérée.</summary>
+    /// <param name="report">Contenu JSON du rapport invalide.</param>
+    /// <param name="diagnostic">Fragment attendu dans le diagnostic écrit sur stderr.</param>
+    /// <returns>Une tâche représentant l'exécution de la commande CI et ses assertions.</returns>
     [Theory]
     [InlineData("{\"version\":2,\"projects\":[{}]}", "Unsupported or empty NuGet audit report")]
     [InlineData("{\"version\":1,\"projects\":[]}", "Unsupported or empty NuGet audit report")]

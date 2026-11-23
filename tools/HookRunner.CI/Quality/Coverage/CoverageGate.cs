@@ -56,6 +56,10 @@ public static class CoverageGate
         return new(assembly, status, uncoveredLines, uncoveredBranches);
     }
 
+    /// <summary>Ajoute comme non couvertes les lignes du PDB absentes des observations du collecteur.</summary>
+    /// <param name="coverage">Observations à compléter sans remplacer les lignes déjà couvertes.</param>
+    /// <param name="expected">Inventaire indépendant des lignes exécutables par fichier.</param>
+    /// <param name="repositoryRoot">Racine locale pour les chemins /_/ ; null conserve ces chemins.</param>
     private static void IncludeExpectedLines(CoverageSnapshot coverage, Dictionary<string, HashSet<string>> expected, string? repositoryRoot)
     {
         // The independent PDB inventory detects documents omitted by the collector.

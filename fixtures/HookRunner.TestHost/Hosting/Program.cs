@@ -36,6 +36,9 @@ internal static class Program
         return await HookRunnerHost.RunAsync(args, services => ConfigureServices(services, mode));
     }
 
+    /// <summary>Retire le préfixe de simulation et place son mode et son résultat dans l'environnement hérité par l'enfant.</summary>
+    /// <param name="args">Arguments pouvant commencer par --test-mode, le mode et le résultat brut.</param>
+    /// <returns>Les arguments sans le préfixe reconnu, ou le tableau d'origine en l'absence de préfixe complet.</returns>
     private static string[] ConfigureTestMode(string[] args)
     {
         if (args.Length >= 3 && args[0] == "--test-mode")
@@ -48,6 +51,9 @@ internal static class Program
         return args;
     }
 
+    /// <summary>Enregistre la dépendance du consommateur et découvre ses hooks avec Scrutor.</summary>
+    /// <param name="services">Collection à compléter avant construction du conteneur HookRunner.</param>
+    /// <param name="mode">duplicate ajoute volontairement une seconde inscription du hook inspect.</param>
     private static void ConfigureServices(IServiceCollection services, string? mode)
     {
         services.AddSingleton<ConsumerDependency>();

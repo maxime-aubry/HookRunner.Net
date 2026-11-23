@@ -51,6 +51,9 @@ internal static class ConsumerProgram
         }
     }
 
+    /// <summary>Remonte depuis le programme de tests jusqu'au dossier contenant HookRunner.slnx.</summary>
+    /// <returns>Le chemin absolu de la racine du dépôt.</returns>
+    /// <exception cref="DirectoryNotFoundException">Aucun dossier ascendant ne contient HookRunner.slnx.</exception>
     private static string RepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

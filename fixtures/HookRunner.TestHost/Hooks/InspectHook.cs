@@ -23,8 +23,8 @@ public sealed class InspectHook(ConsumerDependency dependency) : HookStrategy
     /// <returns>Une tâche écrivant l'observation JSON au chemin observation_path de l'événement.</returns>
     /// <remarks>
     /// HOOKRUNNER_TEST_MODE peut demander une attente annulable ou un blocage C# ignorant l'annulation avec
-    /// publication du PID, une sortie immédiate 23 ou une exception technique. Le parcours normal écrit sur stdout pour vérifier son drainage par le
-    /// superviseur.
+    /// publication du PID, une sortie immédiate 23 ou une exception technique. Le parcours normal écrit sur
+    /// stdout pour vérifier son drainage par le superviseur.
     /// </remarks>
     /// <exception cref="InvalidOperationException">Le mode technical-failure simule une panne du hook.</exception>
     public override async Task ExecuteAsync(InvocationData invocation, HookOptions options, CancellationToken cancellationToken)

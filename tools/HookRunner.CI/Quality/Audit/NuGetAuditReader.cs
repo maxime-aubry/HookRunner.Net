@@ -5,6 +5,11 @@ namespace HookRunner.CI;
 /// <summary>Valide le rapport NuGet et parcourt ses dépendances directes et transitives.</summary>
 internal static class NuGetAuditReader
 {
+    /// <summary>Valide le rapport et énumère les vulnérabilités avec leur projet et leur package d'origine.</summary>
+    /// <param name="report">Racine JSON du rapport d'audit NuGet.</param>
+    /// <returns>Les vulnérabilités des packages directs et transitifs, sans filtrage de sévérité.</returns>
+    /// <remarks>La lecture est différée ; le document JSON doit rester disponible pendant l'énumération.</remarks>
+    /// <exception cref="InvalidDataException">La version est incompatible, aucun projet n'est présent ou la collecte a échoué.</exception>
     public static IEnumerable<(JsonElement Project, JsonElement Package, JsonElement Vulnerability)> Read(JsonElement report)
     {
         Validate(report);
@@ -23,6 +28,9 @@ internal static class NuGetAuditReader
         }
     }
 
+    /// <summary>Refuse un rapport de version non prise en charge, sans projet ou signalant un problème de collecte.</summary>
+    /// <param name="report">Rapport NuGet dont les champs de contrôle sont inspectés.</param>
+    /// <exception cref="InvalidDataException">La version diffère de 1, projects est vide ou problems contient une entrée.</exception>
     private static void Validate(JsonElement report)
     {
         if (report.GetProperty("version").GetInt32() != 1 || report.GetProperty("projects").GetArrayLength() == 0)
@@ -36,6 +44,9 @@ internal static class NuGetAuditReader
         }
     }
 
+    /// <summary>Parcourt les packages directs et transitifs de chaque framework du projet.</summary>
+    /// <param name="project">Entrée de projet NuGet pouvant omettre la propriété frameworks.</param>
+    /// <returns>Les packages présents ; une séquence vide si aucun framework n'est déclaré.</returns>
     private static IEnumerable<JsonElement> Packages(JsonElement project)
     {
         // NuGet omits frameworks entirely when the project has no findings.

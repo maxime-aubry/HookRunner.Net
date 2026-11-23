@@ -139,6 +139,8 @@ public sealed class UseCaseTests
         Assert.Equal(nearest, executor.Request!.Options.SolutionRoot);
     }
 
+    /// <summary>Vérifie que le timeout de la commande remplace la configuration dans la requête isolée.</summary>
+    /// <returns>Une tâche représentant le scénario de préparation et ses assertions.</returns>
     [Fact]
     public async Task CommandTimeoutOverridesConfiguration()
     {

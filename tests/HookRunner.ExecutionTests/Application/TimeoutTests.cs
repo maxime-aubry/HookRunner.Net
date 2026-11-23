@@ -6,7 +6,7 @@ namespace HookRunner.ExecutionTests;
 public sealed class TimeoutTests
 {
     /// <summary>Le démarrage et les étapes du hook consomment le même budget sans grâce coopérative.</summary>
-    /// <returns>Le scénario avec deux étapes synchronisées et une horloge contrôlée.</returns>
+    /// <returns>Une tâche vérifiant la demande d'arrêt à l'échéance et l'attente de sa confirmation.</returns>
     [Fact]
     public async Task StartupAndExecutionShareOneBudgetAndRequestImmediateTermination()
     {
@@ -43,7 +43,7 @@ public sealed class TimeoutTests
 
     /// <summary>Un échec de confirmation reste technique, même si son attente échoue par annulation.</summary>
     /// <param name="cancelledConfirmation">Simule une échéance technique distincte du token d'exécution.</param>
-    /// <returns>Le code et le diagnostic observés après expiration.</returns>
+    /// <returns>Une tâche vérifiant le code 2 et le diagnostic technique après expiration.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -73,7 +73,7 @@ public sealed class TimeoutTests
 
     /// <summary>Une annulation extérieure prime sur un verdict tardif et sur le timeout simultané.</summary>
     /// <param name="expire">Déclenche aussi l'échéance globale.</param>
-    /// <returns>Le diagnostic technique d'annulation.</returns>
+    /// <returns>Une tâche vérifiant que l'annulation extérieure produit un diagnostic technique et le code 2.</returns>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -105,7 +105,7 @@ public sealed class TimeoutTests
     }
 
     /// <summary>Une annulation préalable empêche le lancement, même si l'adaptateur ignore le token.</summary>
-    /// <returns>Le diagnostic technique sans exécution.</returns>
+    /// <returns>Une tâche vérifiant le code 2 sans lancement de l'exécuteur.</returns>
     [Fact]
     public async Task AlreadyCancelledInvocationDoesNotStartTheChild()
     {
@@ -129,7 +129,7 @@ public sealed class TimeoutTests
     }
 
     /// <summary>Le plus grand entier accepté reste un budget unique malgré plusieurs minuteries techniques.</summary>
-    /// <returns>Le timeout à l'échéance exacte, sans attente réelle.</returns>
+    /// <returns>Une tâche vérifiant le timeout à l'échéance exacte avec une horloge contrôlée.</returns>
     [Fact]
     public async Task MaximumRepresentableTimeoutExpiresWithoutRenewingItsBudget()
     {
@@ -154,8 +154,8 @@ public sealed class TimeoutTests
     }
 
     /// <summary>Ignore le verdict métier arrivé après l'échéance globale et trace le timeout.</summary>
-    /// <param name="dispatchTimers">Simule aussi un rappel de minuterie retardé par l'ordonnanceur.</param>
-    /// <returns>Le scénario sans attente réelle.</returns>
+    /// <param name="dispatchTimers">False retarde les rappels pour vérifier le contrôle monotone de l'échéance.</param>
+    /// <returns>Une tâche vérifiant que le résultat tardif est remplacé par un diagnostic de timeout.</returns>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -186,7 +186,7 @@ public sealed class TimeoutTests
         /// <summary>Délègue l'exécution à la simulation du scénario.</summary>
         /// <param name="request">Requête déjà préparée.</param>
         /// <param name="cancellationToken">Token global de l'invocation.</param>
-        /// <returns>Le résultat simulé de l'enfant.</returns>
+        /// <returns>La tâche de résultat ou d'échec fournie par le scénario.</returns>
         public Task<HookExecutionResult> ExecuteAsync(IsolatedHookRequest request, CancellationToken cancellationToken)
             => execute(cancellationToken);
     }

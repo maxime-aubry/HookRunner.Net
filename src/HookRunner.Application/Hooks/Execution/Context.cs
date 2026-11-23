@@ -52,6 +52,10 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
         }
     }
 
+    /// <summary>Supervise la requête sélectionnée puis écrit le diagnostic correspondant au résultat.</summary>
+    /// <param name="cancellationToken">Annulation extérieure, distincte de l'échéance du hook.</param>
+    /// <returns>Une tâche donnant 0 pour un succès ou un timeout confirmé, sinon 2.</returns>
+    /// <exception cref="InvalidOperationException">Aucune stratégie n'a été préparée dans ce contexte.</exception>
     private async Task<int> ExecutePreparedAsync(CancellationToken cancellationToken)
     {
         IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");

@@ -35,6 +35,9 @@ public static class AuditGate
         return [.. blocking];
     }
 
+    /// <summary>Applique le seuil de blocage aux sévérités de l'audit NuGet sans distinction de casse.</summary>
+    /// <param name="severity">Sévérité déclarée par NuGet ; peut être null.</param>
+    /// <returns>True pour High ou Critical ; false pour toute autre valeur.</returns>
     private static bool IsBlockingSeverity(string? severity)
         => string.Equals(severity, "High", StringComparison.OrdinalIgnoreCase)
             || string.Equals(severity, "Critical", StringComparison.OrdinalIgnoreCase);

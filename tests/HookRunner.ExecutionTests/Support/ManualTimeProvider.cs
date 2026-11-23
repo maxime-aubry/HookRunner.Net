@@ -16,8 +16,8 @@ internal sealed class ManualTimeProvider : TimeProvider
     /// <summary>Installe une minuterie contrôlée par Advance.</summary>
     /// <param name="callback">Action à l'échéance.</param>
     /// <param name="state">État transmis à l'action.</param>
-    /// <param name="dueTime">Délai initial.</param>
-    /// <param name="period">Période, ou InfiniteTimeSpan pour un déclenchement unique.</param>
+    /// <param name="dueTime">Délai initial, ou InfiniteTimeSpan pour ne pas programmer d'échéance.</param>
+    /// <param name="period">Doit être InfiniteTimeSpan ; les minuteries périodiques sont refusées.</param>
     /// <returns>La minuterie enregistrée.</returns>
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
@@ -66,7 +66,7 @@ internal sealed class ManualTimeProvider : TimeProvider
         public long Due { get; set; } = long.MaxValue;
 
         /// <summary>Planifie l'échéance unique ; les périodes sont refusées pour éviter une simulation trompeuse.</summary>
-        /// <param name="dueTime">Délai avant déclenchement.</param>
+        /// <param name="dueTime">Délai avant déclenchement, ou InfiniteTimeSpan pour désarmer la minuterie.</param>
         /// <param name="period">Doit être InfiniteTimeSpan.</param>
         /// <returns>True une fois l'échéance modifiée.</returns>
         public bool Change(TimeSpan dueTime, TimeSpan period)
@@ -80,7 +80,7 @@ internal sealed class ManualTimeProvider : TimeProvider
             return true;
         }
 
-        /// <summary>Exécute le rappel à l'échéance.</summary>
+        /// <summary>Exécute le rappel avec son état ; l'horloge a déjà sélectionné la minuterie arrivée à échéance.</summary>
         public void Fire() => callback(state);
 
         /// <summary>Retire la minuterie des échéances à déclencher.</summary>

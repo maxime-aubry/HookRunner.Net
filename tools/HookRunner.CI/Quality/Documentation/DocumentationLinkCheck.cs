@@ -34,6 +34,9 @@ internal static class DocumentationLinkCheck
         return 0;
     }
 
+    /// <summary>Extrait les cibles relatives des liens Markdown en retirant les fragments d'ancre.</summary>
+    /// <param name="file">Fichier Markdown à lire lors de l'énumération.</param>
+    /// <returns>Les cibles locales non vides, sans les éventuels chevrons qui les entourent.</returns>
     private static IEnumerable<string> LocalTargets(string file)
     {
         foreach (Match match in Regex.Matches(File.ReadAllText(file), @"\]\(([^)]+)\)", RegexOptions.None, TimeSpan.FromSeconds(1)))
@@ -46,6 +49,10 @@ internal static class DocumentationLinkCheck
         }
     }
 
+    /// <summary>Décode une cible relative et vérifie son existence à partir du dossier du document.</summary>
+    /// <param name="file">Document Markdown contenant le lien.</param>
+    /// <param name="target">Cible locale du lien, sans fragment d'ancre.</param>
+    /// <exception cref="FileNotFoundException">La cible résolue n'existe ni comme fichier ni comme dossier.</exception>
     private static void ValidateTarget(string file, string target)
     {
         string resolved = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, Uri.UnescapeDataString(target)));

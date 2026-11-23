@@ -46,6 +46,10 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
         return new HookOptions(timeout, root, root, [], statePath.Resolve(root));
     }
 
+    /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>
+    /// <param name="overrideSeconds">Timeout demandé par la commande ; null conserve la configuration.</param>
+    /// <returns>Le budget effectif en secondes, strictement positif.</returns>
+    /// <exception cref="InvalidDataException">Le timeout effectif est nul ou négatif.</exception>
     private int ResolveTimeoutSeconds(int? overrideSeconds)
     {
         int timeout = overrideSeconds ?? defaultTimeoutSeconds;

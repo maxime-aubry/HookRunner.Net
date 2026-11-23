@@ -9,7 +9,7 @@ namespace HookRunner.ExecutionTests;
 public sealed class ProcessExecutionTests
 {
     /// <summary>Le budget de démarrage est conservé et l'échéance arrête un hook C# ignorant toute annulation.</summary>
-    /// <returns>Le code 0 une fois la mort de l'enfant confirmée.</returns>
+    /// <returns>Une tâche vérifiant le code 0 et la terminaison forcée de l'enfant à l'échéance.</returns>
     [Fact]
     public async Task GlobalTimeoutForciblyTerminatesANonCooperatingChild()
     {

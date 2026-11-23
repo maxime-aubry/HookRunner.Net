@@ -75,6 +75,12 @@ internal static class ChildHookEntryPoint
         }
     }
 
+    /// <summary>Lit la requête préparée et exécute la stratégie résolue dans le conteneur enfant.</summary>
+    /// <param name="requestPath">Chemin du fichier JSON transmis par le superviseur.</param>
+    /// <param name="provider">Conteneur des stratégies et dépendances du consommateur.</param>
+    /// <param name="cancellationToken">Annulation transmise à la lecture et à la stratégie.</param>
+    /// <returns>Une tâche terminée lorsque le traitement du hook est achevé.</returns>
+    /// <remarks>Les erreurs de lecture, de sélection et d'exécution remontent à la construction du résultat enfant.</remarks>
     private static async Task ExecuteRequestAsync(string requestPath, IServiceProvider provider, CancellationToken cancellationToken)
     {
         IsolatedHookRequest request = await ReadRequestAsync(requestPath, cancellationToken).ConfigureAwait(false);
@@ -82,6 +88,12 @@ internal static class ChildHookEntryPoint
         await strategy.ExecuteAsync(request.Invocation, request.Options, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Désérialise la requête en exigeant les paramètres obligatoires et les valeurs non nullables.</summary>
+    /// <param name="requestPath">Chemin du fichier JSON de l'invocation préparée.</param>
+    /// <param name="cancellationToken">Annulation de la lecture du fichier.</param>
+    /// <returns>Une tâche donnant la requête désérialisée sans recalculer ses options.</returns>
+    /// <exception cref="InvalidDataException">Le document JSON représente une valeur null.</exception>
+    /// <exception cref="JsonException">Le JSON est mal formé ou ne respecte pas le contrat de la requête.</exception>
     private static async Task<IsolatedHookRequest> ReadRequestAsync(string requestPath, CancellationToken cancellationToken)
     {
         string json = await File.ReadAllTextAsync(requestPath, cancellationToken).ConfigureAwait(false);

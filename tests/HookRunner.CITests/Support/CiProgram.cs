@@ -6,6 +6,9 @@ namespace HookRunner.CITests;
 /// <summary>Lance le programme CI réel et garantit la fin du processus de test.</summary>
 internal static class CiProgram
 {
+    /// <summary>Lance l'outil CI compilé avec un délai maximal de trente secondes lié à l'annulation du test.</summary>
+    /// <param name="arguments">Commande et arguments transmis séparément au programme CI.</param>
+    /// <returns>Une tâche donnant le code de sortie et le texte complet de stderr.</returns>
     public static async Task<(int ExitCode, string Error)> RunAsync(string[] arguments)
     {
         ProcessStartInfo start = new("dotnet")
@@ -26,6 +29,10 @@ internal static class CiProgram
         return await WaitForResultAsync(process, timeout.Token);
     }
 
+    /// <summary>Capture stderr et attend la sortie, puis arrête l'arbre du processus s'il est encore actif.</summary>
+    /// <param name="process">Processus CI déjà démarré avec stderr redirigé.</param>
+    /// <param name="cancellationToken">Annulation ou échéance technique du test.</param>
+    /// <returns>Une tâche donnant le code de sortie et les diagnostics collectés.</returns>
     private static async Task<(int ExitCode, string Error)> WaitForResultAsync(Process process, CancellationToken cancellationToken)
     {
         try

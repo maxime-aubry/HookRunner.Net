@@ -28,12 +28,21 @@ internal static class CoverageCheck
         return results.Any(result => result.Status == "failed") ? 1 : 0;
     }
 
+    /// <summary>Recense récursivement les projets de production sous src.</summary>
+    /// <param name="root">Racine du dépôt contenant le dossier src.</param>
+    /// <returns>Les chemins des fichiers .csproj découverts.</returns>
+    /// <exception cref="InvalidOperationException">Aucun projet de production n'est découvert.</exception>
     private static string[] DiscoverProjects(string root)
     {
         string[] projects = Directory.GetFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories);
         return projects.Length > 0 ? projects : throw new InvalidOperationException("No production projects discovered.");
     }
 
+    /// <summary>Charge tous les rapports coverage.json et détache leurs racines des documents temporaires.</summary>
+    /// <param name="directory">Dossier d'artefacts à parcourir récursivement.</param>
+    /// <returns>Les racines JSON utilisables après libération des documents de lecture.</returns>
+    /// <exception cref="FileNotFoundException">Aucun rapport coverage.json n'est découvert.</exception>
+    /// <exception cref="JsonException">Un rapport contient un document JSON invalide.</exception>
     private static List<JsonElement> ReadReports(string directory)
     {
         string[] paths = Directory.GetFiles(directory, "coverage.json", SearchOption.AllDirectories);
@@ -52,6 +61,12 @@ internal static class CoverageCheck
         return reports;
     }
 
+    /// <summary>Confronte l'inventaire PDB d'un projet à l'ensemble des observations Coverlet.</summary>
+    /// <param name="project">Chemin du .csproj déterminant le nom du fichier d'inventaire.</param>
+    /// <param name="artifacts">Dossier contenant les inventaires de compilation.</param>
+    /// <param name="reports">Rapports Coverlet des suites de tests.</param>
+    /// <param name="root">Racine du dépôt utilisée pour résoudre les chemins déterministes.</param>
+    /// <returns>Le verdict de couverture du projet et ses points non couverts.</returns>
     private static CoverageResult EvaluateProject(string project, string artifacts, List<JsonElement> reports, string root)
     {
         string path = Path.Combine(artifacts, "inventory", Path.GetFileNameWithoutExtension(project) + ".txt");

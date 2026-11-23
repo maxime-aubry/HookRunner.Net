@@ -4,6 +4,10 @@ namespace HookRunner.CI;
 
 internal static class PdbSequencePointReader
 {
+    /// <summary>Inventorie les débuts de lignes exécutables visibles d'un PDB portable en excluant les sources sous obj.</summary>
+    /// <param name="pdbPath">Chemin du PDB portable produit avec l'assembly de production.</param>
+    /// <returns>Les numéros de lignes distincts par chemin source normalisé avec des barres obliques.</returns>
+    /// <exception cref="BadImageFormatException">Le fichier ne contient pas un PDB portable exploitable.</exception>
     public static Dictionary<string, HashSet<string>> Read(string pdbPath)
     {
         using FileStream stream = File.OpenRead(pdbPath);

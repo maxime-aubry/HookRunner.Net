@@ -8,6 +8,29 @@ namespace HookRunner.ExecutionTests;
 /// </summary>
 public sealed class UseCaseTests
 {
+    /// <summary>Une jonction vers un autre lecteur est refusée avant toute exécution ou création d'état.</summary>
+    /// <returns>Une tâche vérifiant l'erreur de préparation à travers le cas d'usage public.</returns>
+    [Fact]
+    public async Task StateFilePathCannotEscapeToAnotherDriveThroughADirectoryLink()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Cross-drive junctions require Windows drive letters.");
+        using SolutionFixture fixture = new();
+        using SolutionFixture outside = new();
+        using MappedDrive drive = new(fixture.Root);
+        using DirectoryLink link = new(Path.Combine(fixture.Root, "escape"), outside.Root);
+        RecordingExecutor executor = new();
+        using StringWriter diagnostics = new();
+        RunHookUseCase useCase = new([new TestHook("chosen")], new HookOptionsPreparer(120, "escape/state.json"),
+            new Context(executor, diagnostics, new FileHookStateStore()));
+        InvocationData invocation = fixture.Invocation with { WorkingDirectory = Path.Combine(drive.Root, "agent", "nested") };
+
+        InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() => useCase.ExecuteAsync(
+            new RunHookRequest(new RunHookArgs("chosen", null, []), invocation), TestContext.Current.CancellationToken));
+
+        Assert.Contains("StateFilePath", exception.Message, StringComparison.Ordinal);
+        Assert.Null(executor.Request);
+    }
+
     /// <summary>Les liens de dossier ne permettent pas de placer l'état hors de la racine physique.</summary>
     /// <param name="relativePath">Chemin de l'état traversant la jonction ou le lien symbolique.</param>
     /// <returns>Une tâche vérifiant le refus avant exécution.</returns>

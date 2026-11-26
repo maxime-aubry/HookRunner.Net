@@ -23,7 +23,7 @@ internal sealed class StateFilePathResolver
         this.relativePath = relativePath;
     }
 
-    /// <summary>Résout le chemin d'état et refuse une remontée hors de la racine de solution.</summary>
+    /// <summary>Résout le chemin d'état et refuse une destination hors de la racine physique de solution.</summary>
     /// <param name="solutionRoot">Racine absolue utilisée comme base de résolution.</param>
     /// <returns>Le chemin absolu normalisé du fichier d'état, sans créer de fichier ni de dossier.</returns>
     /// <exception cref="InvalidDataException">Le chemin normalisé sort de la racine de solution.</exception>
@@ -39,7 +39,8 @@ internal sealed class StateFilePathResolver
         string canonical = CanonicalPath.Resolve(resolved);
         string canonicalRoot = CanonicalPath.Resolve(solutionRoot);
         string physicalRelative = Path.GetRelativePath(canonicalRoot, canonical);
-        if (physicalRelative == ".." || physicalRelative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        if (Path.IsPathRooted(physicalRelative)
+            || physicalRelative == ".." || physicalRelative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
         {
             throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
         }

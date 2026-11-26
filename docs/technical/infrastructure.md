@@ -28,6 +28,8 @@ La recherche ascendante appartient à
 [SolutionRootLocator](../../src/HookRunner.Infrastructure/Configuration/SolutionRootLocator.cs).
 [StateFilePathResolver](../../src/HookRunner.Infrastructure/Configuration/StateFilePathResolver.cs)
 regroupe la validation du chemin configuré et son confinement dans la solution.
+Le contrôle porte aussi sur la destination physique des liens : une jonction
+vers un autre lecteur Windows est refusée avant l'ouverture de l'état.
 Le préparateur conserve l'ordre des validations et assemble les options finales.
 
 ## Persistance des compteurs

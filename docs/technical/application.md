@@ -22,8 +22,9 @@ dans l'enfant. Il n'est pas déduit du nom de la classe.
 Méthode abstraite publique renvoyant `Task`. `invocation` contient l'événement
 d'origine ; `options` contient les paramètres préparés pour cet appel. Le hook
 doit respecter le token pour ses opérations annulables. Une terminaison normale
-indique un succès ; une exception remonte au point d'entrée enfant, qui produit
-actuellement un échec technique. La classe de base ne fournit pas encore de
+indique un succès ; une `HookValidationException` remonte au point d'entrée enfant,
+qui produit une demande de correction soumise au plafond. Les autres exceptions
+produisent un échec technique. La classe de base ne fournit pas encore de
 méthode d'exécution de commande ou de prompt.
 
 ## InvocationData
@@ -273,3 +274,6 @@ racine physique, agent, session et nom du hook normalisé sans distinction de ca
 [`HookValidationException`](../../src/HookRunner.Domain/Validation/HookValidationException.cs)
 transporte diagnostics et consignes métier. `HookExecutionResult.FromException`
 traduit cette exception en `ValidationFailure`, les autres en `TechnicalFailure`.
+Les constructeurs de `HookValidationException` conservent les consignes explicites
+et remplacent un message vide ou composé d'espaces par un diagnostic métier par défaut.
+Ces demandes consomment le même plafond que les autres demandes de correction.

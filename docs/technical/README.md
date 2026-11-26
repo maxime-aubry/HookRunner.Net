@@ -108,7 +108,8 @@ dans le superviseur.
 | Situation | Comportement présent |
 | --- | --- |
 | Succès du hook | `Success`, trace sur stderr, code final `0`. |
-| Exception du hook | `TechnicalFailure` avec son message, code final `2`. |
+| `HookValidationException` du hook | `ValidationFailure`, code final `2` sous plafond ou `0` au plafond. |
+| Autre exception du hook | `TechnicalFailure` avec son message, code final `2`. |
 | Arguments, événement ou configuration invalides | Diagnostic `HookRunner: ...`, code `2`, sans exécution du hook. |
 | Résultat enfant manquant ou invalide | Erreur technique, code `2`. |
 | Annulation externe pendant l'attente de l'enfant | Tentative d'arrêt de son arbre de processus, diagnostic, code `2`. |

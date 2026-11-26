@@ -53,8 +53,14 @@ sérialisation et timeout pendant l'attente via `RunHookUseCase`.
 couvre les règles pures et les exceptions métier.
 [`HostCounterTests`](../../tests/HookRunner.ExecutionTests/Integration/HostCounterTests.cs)
 vérifie persistance entre lancements, surcharges et concurrence interprocessus.
+Les demandes à message vide ou composé d'espaces passent par le véritable enfant
+et consomment le plafond, avec trois retours `2` puis un retour `0`.
 [`DirectoryLink`](../../tests/HookRunner.ExecutionTests/Support/DirectoryLink.cs)
 crée un lien symbolique Unix ou une jonction Windows pour tester les alias physiques.
+[`MappedDrive`](../../tests/HookRunner.ExecutionTests/Support/MappedDrive.cs)
+associe temporairement une lettre libre à une fixture Windows avec `subst`, puis
+retire cette association sans supprimer le dossier cible. `UseCaseTests` l'utilise
+pour vérifier qu'une jonction vers un autre lecteur est refusée avant l'exécution.
 
 La collection
 [`ProcessTestsGroup`](../../tests/HookRunner.ExecutionTests/Support/ProcessTestsGroup.cs)
@@ -97,7 +103,7 @@ contenant son PID, les données reçues et la valeur de
 Les modes contrôlés de
 [HookFailureSimulation](../../fixtures/HookRunner.TestHost/Hooks/HookFailureSimulation.cs)
 simulent attente annulable, blocage C# ignorant l'annulation,
-exception, sortie inattendue, doublon
+exception métier à message fourni par le scénario, exception technique, sortie inattendue, doublon
 de stratégie et résultat de protocole invalide. Ils ne nécessitent aucun
 appel à un modèle. La fixture sert aussi à la consommation des packages
 NuGet dans `scripts/test-consumer-packages.ps1`.

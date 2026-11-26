@@ -6,6 +6,35 @@ namespace HookRunner.ExecutionTests;
 [Collection("Processes")]
 public sealed class HostCounterTests
 {
+    /// <summary>Une demande sans consigne explicite reste métier et consomme le plafond entre lancements.</summary>
+    /// <param name="message">Message vide ou composé d'espaces levé par la stratégie enfant.</param>
+    /// <returns>Une tâche vérifiant les trois blocages puis le retour permissif, sans erreur de transport.</returns>
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t")]
+    public async Task ValidationRequestsWithoutInstructionsStillConsumeTheLimit(string message)
+    {
+        using SolutionFixture fixture = new();
+        ConsumerHost host = new(fixture.Root);
+        string json = JsonSerializer.Serialize(new
+        {
+            session_id = "empty-message-session",
+            hook_event_name = "Stop",
+            cwd = fixture.Root,
+            observation_path = Path.Combine(fixture.Root, "observation.json"),
+        });
+        List<int> exits = [];
+        for (int index = 0; index < 4; index++)
+        {
+            HostResult result = await host.RunAsync(["execute", "inspect", "--agent", "codex"], json,
+                new HostSimulation("validation-failure-message", message));
+            exits.Add(result.ExitCode);
+            Assert.DoesNotContain("Invalid hook child result", result.Error, StringComparison.Ordinal);
+        }
+
+        Assert.Equal([2, 2, 2, 0], exits);
+    }
+
     /// <summary>Les mises à jour interprocessus ne perdent ni demandes partagées ni sessions indépendantes.</summary>
     /// <returns>Une tâche vérifiant les codes et le nettoyage des temporaires.</returns>
     [Fact]

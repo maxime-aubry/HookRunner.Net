@@ -13,6 +13,18 @@ arbitrary line limit. Length, deep nesting, and several unrelated phases are sig
 to inspect, not automatic violations. Report the responsibilities being mixed and
 the useful extraction; avoid splitting cohesive code into forwarding methods.
 
+## Control flow and debugging
+
+Prefer explicit `if`/`else` branches over ternary conditional expressions (`?:`).
+Put branch-specific operations on separate statements so a debugger can stop on
+each branch and intermediate values can be inspected. Apply this especially to
+nested conditions, method calls, and expressions that combine several operations.
+
+Reserve ternaries for simple value selections where separate branches would not
+meaningfully improve breakpoint placement or inspection. During review, assess
+debuggability rather than brevity; this preference is a judgement call, not a
+blanket syntax ban.
+
 ## Exception handling
 
 Catch an exception only to recover from it, add useful context, or translate it at

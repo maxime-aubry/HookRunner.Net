@@ -220,8 +220,18 @@ rien. Elle ne valide pas elle-même `invocation`, `options` ou le nom.
 `Context` délègue la gestion du budget et des tokens à
 [InvocationSupervisor](../../src/HookRunner.Application/Hooks/Execution/InvocationSupervisor.cs).
 [ExecutionReporter](../../src/HookRunner.Application/Hooks/Execution/ExecutionReporter.cs)
-traduit ensuite le résultat supervisé en diagnostic et code de sortie.
+traduit ensuite le verdict supervisé en diagnostic et code de sortie.
 Ces modules restent internes ; les contrats publics du contexte sont conservés.
+
+Le superviseur retourne un
+[`InvocationOutcome`](../../src/HookRunner.Application/Hooks/Execution/InvocationOutcome.cs)
+immuable, dont les fabriques contrôlent les associations entre le diagnostic et les cinq verdicts de
+[`InvocationOutcomeKind`](../../src/HookRunner.Application/Hooks/Execution/InvocationOutcomeKind.cs) :
+succès, correction demandée, plafond atteint, échec technique retourné par le hook et timeout confirmé.
+`HookExecutionResult` reste le résultat de l'exécuteur isolé ; les exceptions de supervision remontent au contexte.
+`ExecuteWithinDeadlineAsync` traduit uniquement l'annulation du budget portant le token d'exécution exact.
+`ExecuteAndCheckDeadlineAsync` conserve la possession de la session jusqu'à la fin de
+`ApplyResultToStateAsync`, qui sauvegarde le compteur avant de construire le verdict métier.
 
 Renvoie `Task<int>`. Exige une requête préparée et refuse une annulation
 extérieure préalable avant tout lancement. Une seule échéance monotone démarre

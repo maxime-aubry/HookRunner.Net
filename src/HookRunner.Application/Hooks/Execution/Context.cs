@@ -60,7 +60,7 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
     private async Task<int> ExecutePreparedAsync(CancellationToken cancellationToken)
     {
         IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
-        (HookExecutionResult? result, bool shouldBlock) = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
-        return reporter.Report(execution, result, shouldBlock);
+        InvocationOutcome outcome = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
+        return reporter.Report(execution, outcome);
     }
 }

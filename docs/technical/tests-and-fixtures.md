@@ -10,6 +10,7 @@ privés restent proches des assertions qui les utilisent.
 | --- | --- |
 | [Application/UseCaseTests](../../tests/HookRunner.ExecutionTests/Application/UseCaseTests.cs) | Sélection d'un seul hook, options, recherche ascendante et absence de lancement après erreur. Les stratégies sentinelles lèvent si le superviseur les appelle directement ; l'exécuteur mémorise la requête. |
 | [Application/TimeoutTests](../../tests/HookRunner.ExecutionTests/Application/TimeoutTests.cs) | Budget unique, confirmation, annulation extérieure, résultats tardifs et grands timeouts via Context, avec une horloge contrôlée sans attente réelle. |
+| [Application/StatePersistenceTests](../../tests/HookRunner.ExecutionTests/Application/StatePersistenceTests.cs) | Expiration et annulation extérieure lors de la sauvegarde, priorité de l'annulation extérieure et propagation des pannes de stockage, avec vérification du compteur par l'invocation suivante. |
 | [Infrastructure/Agents/Codex/InvocationTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Agents/Codex/InvocationTests.cs) | Champs natifs invalides, session, dossier et conservation exacte du JSON original. |
 | [Infrastructure/Execution/ProcessExecutionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Execution/ProcessExecutionTests.cs) | Enfant réel, résultats internes invalides, panne de lancement, annulation extérieure et arrêt forcé sur timeout d'un hook ignorant l'annulation. |
 | [Cli/CliTests](../../tests/HookRunner.ExecutionTests/Cli/CliTests.cs) | Arguments, configuration et parcours superviseur. |

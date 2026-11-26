@@ -45,7 +45,12 @@ les blocs de traitement d'erreur et de nettoyage sans élargir leur périmètre.
 
 [CanonicalPath](../../src/HookRunner.Infrastructure/Storage/CanonicalPath.cs)
 résout les composants symboliques et retrouve l'orthographe physique de chaque
-composant existant, selon la sensibilité réelle du volume. Une empreinte
+composant existant, selon la sensibilité réelle du volume. Les suffixes absents
+sont conservés sans création d'entrée. Un lien cassé utilise la cible fournie
+par .NET, même absente ; les erreurs de résolution, notamment les boucles
+signalées par .NET, sont propagées. L'inspection d'existence garde les limites
+de .NET et ne distingue pas une absence d'une erreur masquée par cette inspection.
+Une empreinte
 SHA-256 de la racine physique, de l'agent, de la session et du nom de hook
 normalisé identifie chaque entrée. Les worktrees conservent leurs propres racines.
 Le document JSON versionné contient `Version` et `Counters`, un dictionnaire

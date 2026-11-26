@@ -37,5 +37,15 @@ internal sealed class DirectoryLink : IDisposable
     }
 
     /// <summary>Supprime uniquement le lien, en conservant la cible.</summary>
-    public void Dispose() => Directory.Delete(path);
+    public void Dispose()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.Delete(path);
+        }
+        else
+        {
+            File.Delete(path);
+        }
+    }
 }

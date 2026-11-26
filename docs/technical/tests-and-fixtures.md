@@ -13,6 +13,7 @@ privés restent proches des assertions qui les utilisent.
 | [Infrastructure/Agents/Codex/InvocationTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Agents/Codex/InvocationTests.cs) | Champs natifs invalides, session, dossier et conservation exacte du JSON original. |
 | [Infrastructure/Execution/ProcessExecutionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Execution/ProcessExecutionTests.cs) | Enfant réel, résultats internes invalides, panne de lancement, annulation extérieure et arrêt forcé sur timeout d'un hook ignorant l'annulation. |
 | [Cli/CliTests](../../tests/HookRunner.ExecutionTests/Cli/CliTests.cs) | Arguments, configuration et parcours superviseur. |
+| [Cli/ConfigurationLoaderTests](../../tests/HookRunner.ExecutionTests/Cli/ConfigurationLoaderTests.cs) | Chargement, défauts, valeurs numériques et surcharges sur des fichiers JSON dans des dossiers temporaires indépendants. |
 | [Cli/ChildHookTests](../../tests/HookRunner.ExecutionTests/Cli/ChildHookTests.cs) | Transport enfant et données déjà préparées. |
 | [Cli/HostDisposalTests](../../tests/HookRunner.ExecutionTests/Cli/HostDisposalTests.cs) | Libération asynchrone après succès, panne ou erreur de libération. |
 | [Integration/HostTests](../../tests/HookRunner.ExecutionTests/Integration/HostTests.cs) | Superviseur et enfant réels, scan des stratégies, dépendance consommateur, chargement depuis le programme compilé, flux et codes de sortie. |
@@ -26,6 +27,9 @@ celles sous test afin de conserver l'instrumentation de couverture.
 explicitement ; il peut aussi simuler un retard d'ordonnancement du rappel.
 La collection `ConsoleTestsGroup` sérialise les scénarios qui modifient les
 flux standard et la configuration globale du programme de tests.
+Les tests du loader utilisent la même interface `Load(dossier)` que l'hôte,
+grâce à un accès interne accordé à `HookRunner.ExecutionTests` ; ils ne remplacent
+pas la configuration du programme de tests et peuvent s'exécuter en parallèle.
 
 Dans `Support`, `ConfigurationFile` restaure la configuration initiale et
 `ConsoleCapture` restaure les flux précédents. Les doubles d'exécution

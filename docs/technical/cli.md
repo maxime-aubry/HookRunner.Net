@@ -39,11 +39,21 @@ La commande et la configuration utilisent la même validation.
 
 ## Configuration
 
+[HookRunnerConfigurationLoader](../../src/HookRunner.Cli/Configuration/HookRunnerConfigurationLoader.cs)
+charge obligatoirement `appsettings.json` depuis le dossier fourni à `Load`.
+L'hôte fournit `AppContext.BaseDirectory` lors de la résolution différée du
+préparateur, indépendamment du dossier de lancement. Le loader possède et
+libère la configuration après lecture.
+
+`ReadConfiguration` lit le timeout (défaut 120 secondes), le chemin d'état et
+`MaxBlockingRequests` (défaut trois). `ReadHookLimits` collecte les surcharges
+`Hooks:<nom>:MaxBlockingRequests`, sans distinction de casse. Les plafonds sont
+des entiers non négatifs ; toute surcharge de `StateFilePath` par hook est
+refusée, même pour un hook non sélectionné.
+
 [HookRunnerConfiguration](../../src/HookRunner.Cli/Configuration/HookRunnerConfiguration.cs)
-charge obligatoirement `appsettings.json` depuis `AppContext.BaseDirectory`,
-indépendamment du dossier de lancement. `Load` lit le timeout, avec défaut
-à 120 secondes, le chemin d'état, `MaxBlockingRequests` (défaut trois) et les surcharges `Hooks:<nom>:MaxBlockingRequests`. Les plafonds sont des entiers non négatifs. Toute surcharge de `StateFilePath` par hook est refusée. Un chemin absent sera refusé par le
-préparateur d'options ; la configuration est libérée après lecture.
+transporte uniquement ces valeurs. Son chemin d'état reste non résolu ; un chemin
+absent devient une chaîne vide qui sera refusée par le préparateur d'options.
 
 ## Point d'entrée enfant
 

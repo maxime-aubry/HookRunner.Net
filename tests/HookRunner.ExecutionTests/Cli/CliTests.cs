@@ -10,30 +10,6 @@ namespace HookRunner.ExecutionTests;
 [Collection("Console")]
 public sealed class CliTests
 {
-    /// <summary>Une mauvaise configuration de plafond ou une surcharge d'état ne lance pas le hook.</summary>
-    /// <param name="settings">Section HookRunner invalide.</param>
-    /// <returns>Une tâche vérifiant diagnostic et absence d'exécution.</returns>
-    [Theory]
-    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"MaxBlockingRequests\":-1}")]
-    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"MaxBlockingRequests\":\"invalid\"}")]
-    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"Hooks\":{\"hook\":{\"StateFilePath\":\"other.json\"}}}")]
-    public async Task InvalidCounterConfigurationPreventsExecution(string settings)
-    {
-        using SolutionFixture fixture = new();
-        using ConsoleCapture console = new(EventJson(fixture.Root));
-        using ConfigurationFile configuration = new("{\"HookRunner\":" + settings + "}");
-        CapturingExecutor executor = new();
-        int exit = await HookRunnerHost.RunAsync(["execute", "hook", "--agent", "codex"], services =>
-        {
-            services.AddSingleton<HookStrategy>(new ConsumerHook());
-            services.AddSingleton<IIsolatedHookExecutor>(executor);
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, exit);
-        Assert.NotEmpty(console.Error.ToString());
-        Assert.Null(executor.Request);
-    }
-
     /// <summary>La configuration ne peut pas servir de fichier de compteurs.</summary>
     /// <returns>Une tâche vérifiant le refus et la conservation exacte de la configuration.</returns>
     [Fact]
@@ -146,35 +122,18 @@ public sealed class CliTests
         Assert.Contains("HookRunner:", console.Error.ToString(), StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Vérifie le chargement de la configuration du programme compilé, la surcharge du timeout et la propagation
-    /// du code applicatif.
-    /// </summary>
-    /// <param name="configuredTimeout">Valeur configurée, ou null pour le défaut de 120 secondes.</param>
-    /// <param name="commandTimeout">Surcharge de commande facultative.</param>
-    /// <param name="expectedTimeout">Budget effectif attendu dans les options de l'enfant.</param>
+    /// <summary>Le timeout de commande remplace la valeur chargée depuis le dossier du programme compilé.</summary>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
-    [Theory]
-    [InlineData(null, null, 120)]
-    [InlineData(37, null, 37)]
-    [InlineData(37, "19", 19)]
-    [InlineData(null, "1", 1)]
-    [InlineData(null, "2147483647", int.MaxValue)]
-    public async Task ConfigurationIsLoadedFromTheCompiledProgramAndTheResponseIsPropagated(
-        int? configuredTimeout, string? commandTimeout, int expectedTimeout)
+    [Fact]
+    public async Task CommandTimeoutOverridesConfiguration()
     {
         using SolutionFixture fixture = new();
         using ConsoleCapture console = new(EventJson(fixture.Root));
-        string timeoutSetting = configuredTimeout.HasValue
-            ? $",\"TimeoutSeconds\":{configuredTimeout.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-            : string.Empty;
-        using ConfigurationFile configuration = new($"{{\"HookRunner\":{{\"StateFilePath\":\"Hooks/state.json\"{timeoutSetting}}}}}");
+        using ConfigurationFile configuration = new("""
+            {"HookRunner":{"StateFilePath":"Hooks/state.json","TimeoutSeconds":37}}
+            """);
         CapturingExecutor executor = new();
-        string[] arguments = ["execute", "hook", "--agent", "codex"];
-        if (commandTimeout is not null)
-        {
-            arguments = [.. arguments, "--timeout", commandTimeout];
-        }
+        string[] arguments = ["execute", "hook", "--agent", "codex", "--timeout", "19"];
 
         int exit = await HookRunnerHost.RunAsync(arguments, services =>
         {
@@ -183,7 +142,7 @@ public sealed class CliTests
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exit);
-        Assert.Equal(expectedTimeout, executor.Request!.Options.TimeoutSeconds);
+        Assert.Equal(19, executor.Request!.Options.TimeoutSeconds);
         Assert.Equal(fixture.Root, executor.Request.Options.SolutionRoot);
     }
 
@@ -196,6 +155,7 @@ public sealed class CliTests
     [InlineData("{\"HookRunner\":{\"StateFilePath\":\"/state.json\"}}", "StateFilePath")]
     [InlineData("{\"HookRunner\":{\"StateFilePath\":\"../state.json\"}}", "StateFilePath")]
     [InlineData("{\"HookRunner\":{\"TimeoutSeconds\":\"bad\",\"StateFilePath\":\"state.json\"}}", "TimeoutSeconds")]
+    [InlineData("{\"HookRunner\":{\"MaxBlockingRequests\":-1,\"StateFilePath\":\"state.json\"}}", "MaxBlockingRequests")]
     [InlineData("invalid JSON", "Failed to load configuration")]
     public async Task InvalidConfigurationPreventsExecution(string settings, string diagnostic)
     {

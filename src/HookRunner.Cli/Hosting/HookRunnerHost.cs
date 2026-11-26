@@ -95,7 +95,7 @@ public static class HookRunnerHost
         services.AddTransient<RunHookUseCase>();
         services.AddSingleton<IHookOptionsPreparer>(_ =>
         {
-            HookRunnerConfiguration configuration = HookRunnerConfiguration.Load();
+            HookRunnerConfiguration configuration = HookRunnerConfigurationLoader.Load(AppContext.BaseDirectory);
             return new HookOptionsPreparer(configuration.TimeoutSeconds, configuration.StateFilePath,
                 configuration.MaxBlockingRequests, configuration.HookLimits);
         });

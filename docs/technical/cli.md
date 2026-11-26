@@ -11,8 +11,10 @@ selon le premier argument. Il libère le conteneur de manière asynchrone.
 Toute exception, y compris lors de cette libération, est diagnostiquée sur
 stderr et donne le code `2`.
 
-`RunAsync` se consacre à cette gestion d'erreur. `RunComposedAsync` possède
-la composition, le routage et la libération, tous couverts par le même `catch`.
+`RunAsync` se consacre à cette gestion d'erreur. `RunComposedAsync` valide les
+entrées, compose le conteneur et en assure la libération. `RunEntryPointAsync`
+route l'appel vers le superviseur ou l'enfant avec des branches explicites.
+Toutes ces opérations restent couvertes par le même `catch`.
 
 `BuildServiceProvider` enregistre l'exécuteur isolé, le contexte transitoire,
 le cas d'usage et un préparateur d'options à résolution différée. Le callback
@@ -20,8 +22,9 @@ du consommateur s'exécute après ces valeurs par défaut et peut les remplacer.
 Il est réutilisé dans chaque processus ; il doit donc reconstruire les mêmes
 stratégies et leurs dépendances sans dépendre d'instances du superviseur.
 
-`RunSupervisorAsync` analyse la commande, lit stdin jusqu'à sa fin, adapte
-l'événement Codex puis appelle `RunHookUseCase`. Il propage le code de réponse.
+`ReadRunHookRequestAsync` analyse la commande avant de lire stdin jusqu'à sa fin,
+adapte l'événement Codex et construit la requête. `RunSupervisorAsync` orchestre
+cette préparation puis appelle `RunHookUseCase` et propage le code de réponse.
 La configuration différée n'est résolue que sur ce parcours.
 
 ## Analyse des arguments

@@ -6,6 +6,7 @@ using HookRunner.Infrastructure;
 namespace HookRunner.ExecutionTests;
 
 /// <summary>Scénarios d'intégration du cas d'usage avec des processus enfants réels et contrôlés.</summary>
+[Collection("Processes")]
 public sealed class ProcessExecutionTests
 {
     /// <summary>Le budget de démarrage est conservé et l'échéance arrête un hook C# ignorant toute annulation.</summary>
@@ -19,9 +20,9 @@ public sealed class ProcessExecutionTests
         command = command with { Arguments = [.. command.Arguments, "--test-mode", "uncooperative-wait", ""] };
         using StringWriter diagnostics = new();
         using CancellationTokenSource watchdog = new(TimeSpan.FromSeconds(30));
-        Context context = new(new ProcessHookExecutor(command), diagnostics, clock);
+        Context context = new(new ProcessHookExecutor(command), diagnostics, new FileHookStateStore(), clock);
         context.SetStrategy(new ConsumerStrategy("inspect"), WithOutput(fixture),
-            new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+            new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
         string output = Path.Combine(fixture.Root, "observation.json");
 
         await using RunningInvocation<int> running = new(context.ExecuteAsync, TestContext.Current.CancellationToken);
@@ -68,7 +69,7 @@ public sealed class ProcessExecutionTests
         command = command with { Arguments = [.. command.Arguments, "--test-mode", mode, result] };
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new ConsumerStrategy(hook)], new HookOptionsPreparer(120, "Hooks/state.json"),
-            new Context(new ProcessHookExecutor(command), diagnostics));
+            new Context(new ProcessHookExecutor(command), diagnostics, new FileHookStateStore()));
         InvocationData invocation = WithOutput(fixture);
 
         RunHookResponse response = await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs(hook, null, []), invocation),
@@ -89,7 +90,7 @@ public sealed class ProcessExecutionTests
         using StringWriter diagnostics = new();
         ProcessHookExecutor executor = new(new ChildProcessCommand(Path.Combine(fixture.Root, "missing-executable"), []));
         RunHookUseCase useCase = new([new ConsumerStrategy("inspect")], new HookOptionsPreparer(120, "Hooks/state.json"),
-            new Context(executor, diagnostics));
+            new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         RunHookResponse response = await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("inspect", null, []), fixture.Invocation),
             TestContext.Current.CancellationToken);
@@ -113,7 +114,7 @@ public sealed class ProcessExecutionTests
         using StringWriter diagnostics = new();
         using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
         RunHookUseCase useCase = new([new ConsumerStrategy("inspect")], new HookOptionsPreparer(120, "Hooks/state.json"),
-            new Context(new ProcessHookExecutor(command), diagnostics));
+            new Context(new ProcessHookExecutor(command), diagnostics, new FileHookStateStore()));
         string output = Path.Combine(fixture.Root, "observation.json");
 
         RunHookRequest request = new(new RunHookArgs("inspect", null, []), WithOutput(fixture));

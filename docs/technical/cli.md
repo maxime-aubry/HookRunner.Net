@@ -11,8 +11,10 @@ selon le premier argument. Il libère le conteneur de manière asynchrone.
 Toute exception, y compris lors de cette libération, est diagnostiquée sur
 stderr et donne le code `2`.
 
-`RunAsync` se consacre à cette gestion d'erreur. `RunComposedAsync` possède
-la composition, le routage et la libération, tous couverts par le même `catch`.
+`RunAsync` se consacre à cette gestion d'erreur. `RunComposedAsync` valide les
+entrées, compose le conteneur et en assure la libération. `RunEntryPointAsync`
+route l'appel vers le superviseur ou l'enfant avec des branches explicites.
+Toutes ces opérations restent couvertes par le même `catch`.
 
 `BuildServiceProvider` enregistre l'exécuteur isolé, le contexte transitoire,
 le cas d'usage et un préparateur d'options à résolution différée. Le callback
@@ -20,8 +22,9 @@ du consommateur s'exécute après ces valeurs par défaut et peut les remplacer.
 Il est réutilisé dans chaque processus ; il doit donc reconstruire les mêmes
 stratégies et leurs dépendances sans dépendre d'instances du superviseur.
 
-`RunSupervisorAsync` analyse la commande, lit stdin jusqu'à sa fin, adapte
-l'événement Codex puis appelle `RunHookUseCase`. Il propage le code de réponse.
+`ReadRunHookRequestAsync` analyse la commande avant de lire stdin jusqu'à sa fin,
+adapte l'événement Codex et construit la requête. `RunSupervisorAsync` orchestre
+cette préparation puis appelle `RunHookUseCase` et propage le code de réponse.
 La configuration différée n'est résolue que sur ce parcours.
 
 ## Analyse des arguments
@@ -39,11 +42,21 @@ La commande et la configuration utilisent la même validation.
 
 ## Configuration
 
+[HookRunnerConfigurationLoader](../../src/HookRunner.Cli/Configuration/HookRunnerConfigurationLoader.cs)
+charge obligatoirement `appsettings.json` depuis le dossier fourni à `Load`.
+L'hôte fournit `AppContext.BaseDirectory` lors de la résolution différée du
+préparateur, indépendamment du dossier de lancement. Le loader possède et
+libère la configuration après lecture.
+
+`ReadConfiguration` lit le timeout (défaut 120 secondes), le chemin d'état et
+`MaxBlockingRequests` (défaut trois). `ReadHookLimits` collecte les surcharges
+`Hooks:<nom>:MaxBlockingRequests`, sans distinction de casse. Les plafonds sont
+des entiers non négatifs ; toute surcharge de `StateFilePath` par hook est
+refusée, même pour un hook non sélectionné.
+
 [HookRunnerConfiguration](../../src/HookRunner.Cli/Configuration/HookRunnerConfiguration.cs)
-charge obligatoirement `appsettings.json` depuis `AppContext.BaseDirectory`,
-indépendamment du dossier de lancement. `Load` lit le timeout, avec défaut
-à 120 secondes, et le chemin d'état. Un chemin absent sera refusé par le
-préparateur d'options ; la configuration est libérée après lecture.
+transporte uniquement ces valeurs. Son chemin d'état reste non résolu ; un chemin
+absent devient une chaîne vide qui sera refusée par le préparateur d'options.
 
 ## Point d'entrée enfant
 
@@ -51,7 +64,7 @@ préparateur d'options ; la configuration est libérée après lecture.
 exige le marqueur interne et deux chemins. `ExecuteHookAsync` désérialise
 la requête préparée, résout la stratégie et l'appelle directement. Il ne lit
 ni stdin ni la configuration et ne recrée pas d'orchestration applicative.
-Les erreurs deviennent un résultat technique versionné.
+Une `HookValidationException` devient un résultat de validation ; les autres erreurs deviennent un résultat technique versionné.
 La lecture JSON est isolée dans `ReadRequestAsync` ; `ExecuteRequestAsync`
 sélectionne et exécute la stratégie. `ExecuteHookAsync` se consacre à la
 traduction des exceptions.

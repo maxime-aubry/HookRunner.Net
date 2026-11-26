@@ -11,8 +11,8 @@ JSON or environment variables, never through generated executable shell code.
 `scripts/validate.ps1` runs the same commands locally. `BuildTest` restores the
 solution, builds Release, discovers all test projects under `tests/`, runs
 VSTest with TRX and Coverlet JSON/Cobertura output, generates HTML, then checks
-each production assembly. `Quality` verifies formatting, local Markdown file
-links, and workflows. `Security` queries NuGet and runs the free Gitleaks CLI
+each production assembly. `Quality` checks try/catch structure, formatting, local
+Markdown file links, and workflows. `Security` queries NuGet and runs the free Gitleaks CLI
 against Git history and the working tree with fully redacted reports.
 Each task stops on a failed native command; no `continue-on-error` is used.
 CI restores NuGet lock files in locked mode and caches packages by lock content.
@@ -35,6 +35,7 @@ The exact SDK comes from `global.json`, not the runner's preinstalled default.
 | Available tests and Git-hook integration scenarios | xUnit/VSTest, Bash, PowerShell | Yes | `BuildTest` |
 | Lines and branches per production assembly | Coverlet + independent PDB gate | Yes when measurable | `BuildTest` |
 | Formatting and unused imports | `dotnet format --verify-no-changes --severity info` | Yes | `Quality` |
+| Try with its catch/finally clauses as the sole function-body statement | CI helper + SDK Roslyn syntax parser (`HR0001`) | Yes | `Quality` |
 | Workflow syntax and expressions | actionlint | Yes | `Quality` |
 | Local documentation file links | CI helper | Yes | `Quality` |
 | High/critical direct and transitive vulnerabilities | NuGet audit + JSON gate | Yes | `Security` |
@@ -63,6 +64,15 @@ compiler/analyzer warnings remain errors. No extra StyleCop package is needed
 for the initial rules. Native analyzers catch selected correctness, resource,
 async and security issues; they do not provide a comprehensive dead code,
 duplication, method-size or complexity quality gate. These limits are explicit.
+
+The `try-catch` command in `HookRunner.CI` enforces `HR0001` across handwritten C#
+sources, including tests, fixtures, and CI tools. It uses the Roslyn assemblies
+from the exact SDK pinned in `global.json`; these dependencies are copied only
+with the CI tool and are absent from production packages. The command returns 1
+on violations or invalid syntax and reports source paths, lines, and columns on
+stderr. The detailed scope and review-only exception criteria are in
+[coding standards](../CODING_STANDARDS.md). Its CLI tests cover conforming and
+nonconforming sources; an isolated CI failure probe verifies rejection as well.
 
 ## Coverage policy and reports
 
@@ -108,7 +118,7 @@ never reduce thresholds or add exclusions to make a run green.
 ## Safety checks and maintenance
 
 `scripts/test-ci-failures.ps1` uses a disposable copy to prove that a failed
-test, uncovered branch, formatting error, analyzer violation, and forbidden
+test, uncovered branch, formatting error, try/catch structure, analyzer violation, and forbidden
 project reference fail the appropriate command. Unit tests also verify NuGet
 severity policy and coverage report omissions. Fixtures are separate from the
 four production libraries.
@@ -119,6 +129,9 @@ checks independently. A separate probe changes Cli to an executable to verify
 that its class-library constraint is enforced.
 Production probe types and members include XML documentation so compilation
 reaches the intended analyzer, architecture, or coverage check.
+The branch-coverage probe builds a dedicated assembly and test project in its
+own fixture root. Its gate must report covered lines and an uncovered branch,
+independently of the business code present in the production assemblies.
 
 For dependency changes, update central versions, run `dotnet restore` without
 locked mode to regenerate locks, review lock diffs, then run full validation.

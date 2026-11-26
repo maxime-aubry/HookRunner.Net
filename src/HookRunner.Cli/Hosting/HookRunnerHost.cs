@@ -48,7 +48,7 @@ public static class HookRunnerHost
         }
     }
 
-    /// <summary>Valide les entrées, compose le conteneur et choisit le mode d'exécution selon le premier argument.</summary>
+    /// <summary>Valide les entrées et possède le conteneur pendant toute l'exécution.</summary>
     /// <param name="args">Commande utilisateur ou arguments du protocole enfant.</param>
     /// <param name="configureServices">Enregistrements propres au consommateur.</param>
     /// <param name="childProcess">Commande de relancement ; null utilise le processus courant.</param>
@@ -65,10 +65,28 @@ public static class HookRunnerHost
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configureServices);
         await using ServiceProvider provider = BuildServiceProvider(configureServices, childProcess);
-        bool isHostProcess = args.Length == 0 || args[0] != ChildHookProtocol.Command;
-        return isHostProcess
-            ? await RunSupervisorAsync(args, provider, cancellationToken).ConfigureAwait(false)
-            : await ChildHookEntryPoint.RunAsync(args, provider, cancellationToken).ConfigureAwait(false);
+        return await RunEntryPointAsync(args, provider, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Choisit le point d'entrée du superviseur ou de l'enfant selon le premier argument.</summary>
+    /// <param name="args">Commande utilisateur ou arguments du protocole enfant.</param>
+    /// <param name="provider">Conteneur appartenant à l'appelant et partagé avec le point d'entrée choisi.</param>
+    /// <param name="cancellationToken">Annulation transmise au point d'entrée choisi.</param>
+    /// <returns>Une tâche donnant le code de sortie du point d'entrée choisi.</returns>
+    /// <remarks>Les erreurs se propagent à la frontière publique sans libérer le conteneur ici.</remarks>
+    private static async Task<int> RunEntryPointAsync(
+        string[] args,
+        IServiceProvider provider,
+        CancellationToken cancellationToken)
+    {
+        if (args.Length == 0 || args[0] != ChildHookProtocol.Command)
+        {
+            return await RunSupervisorAsync(args, provider, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            return await ChildHookEntryPoint.RunAsync(args, provider, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -89,18 +107,21 @@ public static class HookRunnerHost
     {
         ServiceCollection services = new();
         services.AddSingleton<IIsolatedHookExecutor>(new ProcessHookExecutor(childProcess ?? ChildProcessCommand.ForCurrentProcess()));
-        services.AddTransient(provider => new Context(provider.GetRequiredService<IIsolatedHookExecutor>(), Console.Error));
+        services.AddSingleton<IHookStateStore, FileHookStateStore>();
+        services.AddTransient(provider => new Context(provider.GetRequiredService<IIsolatedHookExecutor>(), Console.Error,
+            provider.GetRequiredService<IHookStateStore>()));
         services.AddTransient<RunHookUseCase>();
         services.AddSingleton<IHookOptionsPreparer>(_ =>
         {
-            HookRunnerConfiguration configuration = HookRunnerConfiguration.Load();
-            return new HookOptionsPreparer(configuration.TimeoutSeconds, configuration.StateFilePath);
+            HookRunnerConfiguration configuration = HookRunnerConfigurationLoader.Load(AppContext.BaseDirectory);
+            return new HookOptionsPreparer(configuration.TimeoutSeconds, configuration.StateFilePath,
+                configuration.MaxBlockingRequests, configuration.HookLimits);
         });
         configureServices(services);
         return services.BuildServiceProvider();
     }
 
-    /// <summary>Analyse la commande et l'événement Codex lu sur stdin, puis appelle le cas d'usage.</summary>
+    /// <summary>Orchestre la préparation de la requête et l'exécution du cas d'usage du superviseur.</summary>
     /// <param name="args">Arguments de la commande execute.</param>
     /// <param name="provider">Services du superviseur permettant de résoudre le cas d'usage.</param>
     /// <param name="cancellationToken">
@@ -113,12 +134,22 @@ public static class HookRunnerHost
     /// </remarks>
     private static async Task<int> RunSupervisorAsync(string[] args, IServiceProvider provider, CancellationToken cancellationToken)
     {
-        RunHookArgs parsedArguments = RunHookArgumentsParser.Parse(args);
-        string eventJson = await Console.In.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-        InvocationData invocation = CodexEventAdapter.Parse(eventJson);
-        RunHookRequest request = new(parsedArguments, invocation);
+        RunHookRequest request = await ReadRunHookRequestAsync(args, cancellationToken).ConfigureAwait(false);
         RunHookUseCase useCase = provider.GetRequiredService<RunHookUseCase>();
         RunHookResponse response = await useCase.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
         return response.ExitCode;
+    }
+
+    /// <summary>Construit la requête à partir de la commande et de l'événement Codex lu sur stdin.</summary>
+    /// <param name="args">Arguments de la commande execute à analyser avant de lire stdin.</param>
+    /// <param name="cancellationToken">Annulation transmise à la lecture de stdin.</param>
+    /// <returns>Une tâche donnant la requête contenant les arguments et les données d'invocation.</returns>
+    /// <remarks>Consomme stdin ; les erreurs d'arguments, de lecture ou d'événement se propagent à l'hôte.</remarks>
+    private static async Task<RunHookRequest> ReadRunHookRequestAsync(string[] args, CancellationToken cancellationToken)
+    {
+        RunHookArgs parsedArguments = RunHookArgumentsParser.Parse(args);
+        string eventJson = await Console.In.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        InvocationData invocation = CodexEventAdapter.Parse(eventJson);
+        return new RunHookRequest(parsedArguments, invocation);
     }
 }

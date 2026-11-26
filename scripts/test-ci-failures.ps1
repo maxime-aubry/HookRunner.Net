@@ -44,6 +44,22 @@ namespace HookRunner.ArchitectureTests;
 
 public sealed class FailureProbe
 {
+    public void Fails()
+    {
+        int value = 0;
+        try { _ = value; }
+        catch { throw; }
+    }
+}
+'@)
+    Expect-Failure 'try-catch' @('tools/HookRunner.CI/bin/Release/net11.0/HookRunner.CI.dll', 'try-catch', $fixture) 'HR0001'
+    Remove-Item -LiteralPath $probe
+
+    [IO.File]::WriteAllText((Join-Path $fixture $probe), @'
+namespace HookRunner.ArchitectureTests;
+
+public sealed class FailureProbe
+{
     [Fact]
     public void Fails() => Assert.Fail("Intentional CI failure probe");
 }
@@ -125,8 +141,26 @@ public static class FailureProbe
     [IO.File]::WriteAllText($cliPath, $originalCli)
     Remove-Item -LiteralPath $cliProbe
 
-    [IO.File]::WriteAllText($domainProbe, @'
-namespace HookRunner.Domain;
+    # A dedicated assembly keeps this branch-only probe independent of production growth.
+    $coverageRoot = Join-Path $fixture 'coverage-probe'
+    $coverageSource = Join-Path $coverageRoot 'src/HookRunner.CoverageProbe'
+    $coverageTests = Join-Path $coverageRoot 'tests/HookRunner.CoverageProbeTests'
+    New-Item -ItemType Directory -Force -Path $coverageSource, $coverageTests | Out-Null
+    foreach ($configuration in @('Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props')) {
+        Copy-Item -LiteralPath (Join-Path $fixture $configuration) -Destination $coverageRoot
+    }
+    Copy-Item -LiteralPath (Join-Path $fixture 'tests/Directory.Build.props') -Destination (Join-Path $coverageRoot 'tests')
+    [IO.File]::WriteAllText((Join-Path $coverageSource 'HookRunner.CoverageProbe.csproj'), '<Project Sdk="Microsoft.NET.Sdk" />')
+    [IO.File]::WriteAllText((Join-Path $coverageTests 'HookRunner.CoverageProbeTests.csproj'), @'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/HookRunner.CoverageProbe/HookRunner.CoverageProbe.csproj" />
+  </ItemGroup>
+</Project>
+'@)
+    [IO.File]::WriteAllText((Join-Path $coverageSource 'FailureProbe.cs'), @'
+namespace HookRunner.CoverageProbe;
 
 /// <summary>Provides a branch that the probe deliberately leaves uncovered.</summary>
 public static class FailureProbe
@@ -137,23 +171,23 @@ public static class FailureProbe
     public static int Choose(bool value) => value ? 1 : 2;
 }
 '@)
-    [IO.File]::WriteAllText((Join-Path $fixture $probe), @'
-namespace HookRunner.ArchitectureTests;
+    [IO.File]::WriteAllText((Join-Path $coverageTests 'FailureProbe.cs'), @'
+namespace HookRunner.CoverageProbeTests;
 
 public sealed class FailureProbe
 {
     [Fact]
-    public void CoversOneBranch() => Assert.Equal(1, Domain.FailureProbe.Choose(true));
+    public void CoversOneBranch() => Assert.Equal(1, CoverageProbe.FailureProbe.Choose(true));
 }
 '@)
-    $coverage = Join-Path $fixture 'artifacts/coverage/probe/'
+    $coverage = Join-Path $coverageRoot 'artifacts/coverage/probe/'
     New-Item -ItemType Directory -Force -Path $coverage | Out-Null
-    Invoke-Checked $dotnet @('test', $arch, '-c', 'Release', '--no-restore', '-p:CollectCoverage=true',
-        '-p:CoverletOutputFormat=json', "-p:CoverletOutput=$coverage", '-p:Include=[HookRunner.Domain]*', '-p:IncludeTestAssembly=false')
-    Expect-Failure 'coverage-branch' @('tools/HookRunner.CI/bin/Release/net11.0/HookRunner.CI.dll', 'coverage', $fixture) 'failed'
-    $gate = Get-Content -Raw -LiteralPath (Join-Path $fixture 'artifacts/coverage/gate.json') | ConvertFrom-Json
-    $domain = $gate | Where-Object { $_.Assembly -ceq 'HookRunner.Domain' }
-    if ($domain.Status -cne 'failed' -or $domain.UncoveredLines.Count -ne 0 -or $domain.UncoveredBranches.Count -eq 0) { throw 'Expected full line coverage but missing branch coverage.' }
+    Invoke-Checked $dotnet @('test', (Join-Path $coverageTests 'HookRunner.CoverageProbeTests.csproj'), '-c', 'Release', '-p:CollectCoverage=true',
+        '-p:CoverletOutputFormat=json', "-p:CoverletOutput=$coverage", '-p:Include=[HookRunner.CoverageProbe]*', '-p:IncludeTestAssembly=false')
+    Expect-Failure 'coverage-branch' @('tools/HookRunner.CI/bin/Release/net11.0/HookRunner.CI.dll', 'coverage', $coverageRoot) 'failed'
+    $gate = Get-Content -Raw -LiteralPath (Join-Path $coverageRoot 'artifacts/coverage/gate.json') | ConvertFrom-Json
+    if (@($gate).Count -ne 1 -or $gate[0].Assembly -cne 'HookRunner.CoverageProbe' -or $gate[0].Status -cne 'failed' -or
+        $gate[0].UncoveredLines.Count -ne 0 -or $gate[0].UncoveredBranches.Count -eq 0) { throw 'Expected full line coverage but missing branch coverage.' }
     $results | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $reports 'summary.json')
 } finally {
     Set-Location $sourceRoot

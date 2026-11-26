@@ -1,4 +1,5 @@
 using System.Globalization;
+using HookRunner.Domain;
 
 namespace HookRunner.TestHost;
 
@@ -25,6 +26,10 @@ internal static class HookFailureSimulation
                 break;
             case "technical-failure":
                 throw new InvalidOperationException("Consumer technical failure.");
+            case "validation-failure":
+                throw new HookValidationException("Consumer correction required.");
+            case "validation-failure-message":
+                throw new HookValidationException(Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_RESULT") ?? string.Empty);
         }
     }
 

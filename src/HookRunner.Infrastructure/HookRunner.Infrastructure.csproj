@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="HookRunner.ExecutionTests" />
     <ProjectReference Include="../HookRunner.Domain/HookRunner.Domain.csproj" />
     <ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" />
   </ItemGroup>

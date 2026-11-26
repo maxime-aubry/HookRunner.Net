@@ -53,11 +53,12 @@ internal static class ChildHookEntryPoint
     /// Token d'annulation transmis aux opérations qui le prennent en charge.
     /// </param>
     /// <returns>
-    /// Une tâche donnant un résultat versionné de succès ou d'échec technique avec le message de l'exception.
+    /// Une tâche donnant un résultat versionné de succès, de demande de correction ou d'échec technique.
     /// </returns>
     /// <remarks>
     /// Ne lit ni l'entrée native ni la configuration et ne relance ni le cas d'usage ni le contexte. Toute
-    /// exception de lecture, sélection ou exécution, annulation incluse, est convertie en résultat technique.
+    /// HookValidationException devient une demande de correction ; les autres exceptions de lecture,
+    /// sélection ou exécution, annulation incluse, sont converties en résultat technique.
     /// </remarks>
     private static async Task<ChildHookResult> ExecuteHookAsync(
         string requestPath,
@@ -71,7 +72,8 @@ internal static class ChildHookEntryPoint
         }
         catch (Exception exception)
         {
-            return new ChildHookResult(ChildHookProtocol.Version, HookExecutionStatus.TechnicalFailure, exception.Message);
+            HookExecutionResult failure = HookExecutionResult.FromException(exception);
+            return new ChildHookResult(ChildHookProtocol.Version, failure.Status, failure.Diagnostic);
         }
     }
 

@@ -21,8 +21,9 @@ pages ci-dessous décrivent leur implémentation actuelle. Le
 | [Outils CI](ci.md) | Programme de contrôle, couverture, audit et liens de documentation. |
 | [Tests et fixtures](tests-and-fixtures.md) | Consommateur de test, utilitaires, classes imbriquées et rôle de chaque méthode de test. |
 
-`HookRunner.Domain` ne contient actuellement aucun fichier C# écrit à la main.
-Il réserve la couche des futures règles métier. Les fichiers générés sous
+`HookRunner.Domain` porte les règles de compteur, l'identité et l'exception de
+validation métier, décrites avec leurs contrats dans [Application](application.md#stockage-et-règles-de-domain).
+Les fichiers générés sous
 `bin/` et `obj/`, les membres synthétisés par le compilateur et les bibliothèques
 tierces ne font pas partie de cette référence. Pour les scripts et workflows,
 consulter la [documentation CI](../ci.md) et les
@@ -107,13 +108,15 @@ dans le superviseur.
 | Situation | Comportement présent |
 | --- | --- |
 | Succès du hook | `Success`, trace sur stderr, code final `0`. |
-| Exception du hook | `TechnicalFailure` avec son message, code final `2`. |
+| `HookValidationException` du hook | `ValidationFailure`, code final `2` sous plafond ou `0` au plafond. |
+| Autre exception du hook | `TechnicalFailure` avec son message, code final `2`. |
 | Arguments, événement ou configuration invalides | Diagnostic `HookRunner: ...`, code `2`, sans exécution du hook. |
 | Résultat enfant manquant ou invalide | Erreur technique, code `2`. |
 | Annulation externe pendant l'attente de l'enfant | Tentative d'arrêt de son arbre de processus, diagnostic, code `2`. |
 | Timeout global avec arrêt confirmé | Arrêt forcé, trace sur stderr, code `0`, résultat métier tardif ignoré. |
 | Échec de confirmation d'arrêt | Diagnostic technique, code `2`. |
-| `ValidationFailure` reçu par le contexte | Diagnostic et code `2`, comme les autres échecs. |
+| `ValidationFailure` sous plafond | Compteur incrémenté, diagnostic et code `2`. |
+| `ValidationFailure` au plafond | Compteur conservé, trace et code `0`, hook toujours exécuté. |
 
 Le code `0` de l'enfant indique que le fichier de résultat a pu être écrit ;
 le statut du hook se lit dans ce fichier. Il peut donc signaler un échec alors
@@ -121,10 +124,11 @@ que le processus enfant a quitté avec `0`.
 
 Seul l'agent `codex` est accepté. La sélection `--projects` est analysée puis
 refusée. `TimeoutSeconds` est préparé puis appliqué par Context comme budget
-unique couvrant le démarrage et l'exécution isolée. La confirmation d'arrêt
+unique couvrant l'attente du verrou, le démarrage et l'exécution isolée. La confirmation d'arrêt
 utilise un délai technique distinct de cinq secondes. `StateFilePath` est
-préparé et transmis, mais aucun état n'est persisté.
-Les compteurs, le blocage métier, l'adaptation Claude, les services
+préparé et transmis ; un fichier d'état atomique conserve les compteurs entre lancements.
+Un succès remet le compteur à zéro ; erreurs techniques et timeouts le conservent.
+L'adaptation Claude et les services
 de commandes et de prompts restent à implémenter. La présence d'un modèle
 ou d'une valeur d'énumération ne signifie pas que le traitement associé existe.
 

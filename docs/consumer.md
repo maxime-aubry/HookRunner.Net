@@ -39,7 +39,7 @@ public override Task ExecuteAsync(
 Register constructor dependencies in the same callback. It runs in both
 processes, so register reproducible services and keep invocation work in
 `ExecuteAsync`. Instances and services are never serialized between processes.
-An unhandled hook exception is a technical failure with diagnostic and exit `2`.
+Throw `HookRunner.Domain.HookValidationException` to request business corrections. Other unhandled exceptions are technical failures with diagnostic and exit `2`.
 
 Copy your single `appsettings.json` beside the compiled executable:
 
@@ -47,6 +47,7 @@ Copy your single `appsettings.json` beside the compiled executable:
 {
   "HookRunner": {
     "TimeoutSeconds": 120,
+    "MaxBlockingRequests": 3,
     "StateFilePath": "Hooks/state.json"
   }
 }
@@ -63,6 +64,27 @@ directory and the solution under inspection. `StateFilePath` is required and
 resolved relative to the solution root. Rooted paths and paths that normalize
 outside that root are preparation errors. A missing timeout defaults to 120
 seconds; `--timeout` overrides it with a positive integer.
+
+`MaxBlockingRequests` defaults to three and accepts non-negative integers.
+Override a hook with `HookRunner:Hooks:my_hook:MaxBlockingRequests`; names are
+case insensitive. Zero allows the hook to run without emitting business blocks.
+`StateFilePath` remains global and cannot be overridden per hook.
+
+The first three correction requests return `2`; subsequent requests return `0`
+with a limit trace. The hook still runs at the limit. A normal completion resets
+the counter; technical failures and timeouts preserve it. A `0` exit alone never
+means business success. Informational events consume requests as well.
+
+Counters persist in one JSON state file, created automatically if absent. The
+identity combines the physical solution root, triggering agent, session, and
+case insensitive hook name. Events, projects, and timeout do not change it;
+separate worktree directories remain distinct. Unreadable or corrupt state
+produces a diagnostic and `2` without starting the hook or replacing the state.
+Updates use a temporary file in the same directory, flush it, and atomically
+rename it. Adjacent `.lock` files contain no counters and remain in place to
+provide stable interprocess locks: one per identity for the complete invocation,
+and one short lock for merging updates to the shared document. Keep state and
+its lock files out of source control. The configuration is never updated.
 
 For a hook whose `Name` is `my_hook`, launch the consumer from source with:
 
@@ -97,16 +119,16 @@ internal child arguments; these are separate from native Codex commands.
 The global timeout defaults to 120 seconds, is configurable through
 `HookRunner:TimeoutSeconds`, and can be overridden with `--timeout <seconds>`.
 Only strictly positive integers up to `2147483647` are accepted. One budget
-covers child startup and all hook execution. At the deadline, HookRunner
+covers waiting for the identity lock, child startup and all hook execution. At the deadline, HookRunner
 forcibly stops the child process tree even if the hook ignores cancellation,
 then allows up to five seconds to confirm local termination. Confirmed timeout
 emits a trace and returns `0`; failed confirmation or external cancellation
 emits a diagnostic and returns `2`. Late hook results are ignored. Forced stop
 does not guarantee hook cleanup or roll back file changes.
 
-This milestone implements the Codex execution path (#6) and global timeout (#7).
+This milestone implements the Codex execution path (#6), global timeout (#7), and persistent correction counters (#8).
 The following capabilities remain in their own tickets:
-business validation and persistent counters (#8), concurrent state (#9),
+further concurrency scenarios (#9),
 project selection (#10), Claude events (#11), local commands (#12), and prompts
 (#13–#14). `--projects` is rejected until project selection is implemented.
 

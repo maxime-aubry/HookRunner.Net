@@ -17,6 +17,9 @@ read `docs/agents/domain.md`.
 
 ## Coding style
 
+Before changing or reviewing C# code, read [CODING_STANDARDS.md](CODING_STANDARDS.md)
+for method responsibilities, exception handling, and the automated structure check.
+
 Use explicit types for all C# variable declarations, including `foreach`
 and `using` declarations. The `var` keyword is forbidden.
 

@@ -6,7 +6,7 @@ les commandes de validation et les rapports ; cette page décrit leur code C#.
 ## Programme de contrôle
 
 [Source](../../tools/HookRunner.CI/Hosting/Program.cs).
-`Main` route `coverage`, `audit` et `docs`. Les erreurs de lecture ou de
+`Main` route `coverage`, `audit`, `docs` et `try-catch`. Les erreurs de lecture ou de
 structure prises en charge sont écrites sur stderr et donnent `1`.
 
 - [CoverageCheck](../../tools/HookRunner.CI/Quality/Coverage/CoverageCheck.cs) découvre les projets de production, leurs inventaires et
@@ -15,6 +15,16 @@ structure prises en charge sont écrites sur stderr et donnent `1`.
 - [DocumentationLinkCheck](../../tools/HookRunner.CI/Quality/Documentation/DocumentationLinkCheck.cs) résout les liens Markdown locaux relativement à leur
   document et exige une cible existante. Les ancres et URL externes ne sont
   pas contrôlées.
+- [TryCatchCheck](../../tools/HookRunner.CI/Quality/Code/TryCatchCheck.cs) analyse les sources C# avec le parseur Roslyn du SDK fixé.
+  Chaque bloc `try`, avec ses clauses `catch` et `finally` éventuelles, doit occuper
+  seul le corps de sa fonction. Les fonctions locales, lambdas, constructeurs et
+  accesseurs sont contrôlés indépendamment ; les simples `try/finally` suivent
+  la même règle. Les erreurs de syntaxe et violations `HR0001` donnent `1` avec
+  chemin, ligne et colonne sur stderr. Les chaînes et commentaires sont ignorés
+  comme code ; les sorties de compilation et caches ne sont pas parcourus.
+  Les configurations sans symboles, `TRACE`, puis `DEBUG` avec `TRACE` sont
+  analysées et leurs diagnostics dédoublonnés. Les autres symboles conditionnels
+  exigent une extension explicite du contrôle.
 
 ## Couverture
 

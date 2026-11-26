@@ -8,6 +8,66 @@ namespace HookRunner.ExecutionTests;
 /// </summary>
 public sealed class UseCaseTests
 {
+    /// <summary>Une jonction vers un autre lecteur est refusée avant toute exécution ou création d'état.</summary>
+    /// <returns>Une tâche vérifiant l'erreur de préparation à travers le cas d'usage public.</returns>
+    [Fact]
+    public async Task StateFilePathCannotEscapeToAnotherDriveThroughADirectoryLink()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Cross-drive junctions require Windows drive letters.");
+        using SolutionFixture fixture = new();
+        using SolutionFixture outside = new();
+        using MappedDrive drive = new(fixture.Root);
+        using DirectoryLink link = new(Path.Combine(fixture.Root, "escape"), outside.Root);
+        RecordingExecutor executor = new();
+        using StringWriter diagnostics = new();
+        RunHookUseCase useCase = new([new TestHook("chosen")], new HookOptionsPreparer(120, "escape/state.json"),
+            new Context(executor, diagnostics, new FileHookStateStore()));
+        InvocationData invocation = fixture.Invocation with { WorkingDirectory = Path.Combine(drive.Root, "agent", "nested") };
+
+        InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() => useCase.ExecuteAsync(
+            new RunHookRequest(new RunHookArgs("chosen", null, []), invocation), TestContext.Current.CancellationToken));
+
+        Assert.Contains("StateFilePath", exception.Message, StringComparison.Ordinal);
+        Assert.Null(executor.Request);
+    }
+
+    /// <summary>Les liens de dossier ne permettent pas de placer l'état hors de la racine physique.</summary>
+    /// <param name="relativePath">Chemin de l'état traversant la jonction ou le lien symbolique.</param>
+    /// <returns>Une tâche vérifiant le refus avant exécution.</returns>
+    [Theory]
+    [InlineData("escape")]
+    [InlineData("escape/state.json")]
+    public async Task StateFilePathCannotEscapeThroughADirectoryLink(string relativePath)
+    {
+        using SolutionFixture fixture = new();
+        using DirectoryLink link = new(Path.Combine(fixture.Root, "escape"), Path.GetDirectoryName(fixture.Root)!);
+        RecordingExecutor executor = new();
+        using StringWriter diagnostics = new();
+        RunHookUseCase useCase = new([new TestHook("chosen")], new HookOptionsPreparer(120, relativePath),
+            new Context(executor, diagnostics, new FileHookStateStore()));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => useCase.ExecuteAsync(
+            new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation), TestContext.Current.CancellationToken));
+        Assert.Null(executor.Request);
+    }
+
+    /// <summary>Un plafond négatif est une erreur de préparation sans exécution ni état créé.</summary>
+    /// <returns>Une tâche vérifiant le diagnostic de configuration.</returns>
+    [Fact]
+    public async Task NegativeRequestLimitPreventsExecution()
+    {
+        using SolutionFixture fixture = new();
+        using StringWriter diagnostics = new();
+        RecordingExecutor executor = new();
+        RunHookUseCase useCase = new([new TestHook("chosen")], new HookOptionsPreparer(120, "Hooks/state.json", -1),
+            new Context(executor, diagnostics, new FileHookStateStore()));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => useCase.ExecuteAsync(
+            new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation), TestContext.Current.CancellationToken));
+        Assert.Null(executor.Request);
+        Assert.False(File.Exists(Path.Combine(fixture.Root, "Hooks", "state.json")));
+    }
+
     /// <summary>Vérifie qu'un contexte sans stratégie préparée rend 2 sans appeler l'exécuteur.</summary>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
     [Fact]
@@ -15,7 +75,7 @@ public sealed class UseCaseTests
     {
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
-        Context context = new(executor, diagnostics);
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore());
 
         int exit = await context.ExecuteAsync(TestContext.Current.CancellationToken);
 
@@ -40,7 +100,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook(first), new TestHook(second)],
-            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
+            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs(selected, null, []), fixture.Invocation),
@@ -65,7 +125,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
-            new HookOptionsPreparer(timeout, state), new Context(executor, diagnostics));
+            new HookOptionsPreparer(timeout, state), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
@@ -85,7 +145,7 @@ public sealed class UseCaseTests
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
             new HookOptionsPreparer(120, Path.Combine(fixture.Root, "Hooks", "state.json")),
-            new Context(executor, diagnostics));
+            new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
@@ -108,7 +168,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
-            new HookOptionsPreparer(120, statePath), new Context(executor, diagnostics));
+            new HookOptionsPreparer(120, statePath), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
@@ -131,7 +191,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
-            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
+            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
             TestContext.Current.CancellationToken);
@@ -148,7 +208,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
-            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
+            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", 17, []), fixture.Invocation),
             TestContext.Current.CancellationToken);
@@ -166,7 +226,7 @@ public sealed class UseCaseTests
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
         RunHookUseCase useCase = new([new TestHook("chosen")],
-            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
+            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore()));
 
         await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
             useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
@@ -186,7 +246,7 @@ public sealed class UseCaseTests
         using SolutionFixture fixture = new();
         RecordingExecutor executor = new();
         using StringWriter diagnostics = new();
-        Context context = new(executor, diagnostics);
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore());
         RunHookUseCase useCase = new(
             [new TestHook("chosen"), new TestHook("other")],
             new HookOptionsPreparer(120, "Hooks/state.json"), context);

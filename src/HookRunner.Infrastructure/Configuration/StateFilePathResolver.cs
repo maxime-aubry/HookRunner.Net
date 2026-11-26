@@ -23,7 +23,7 @@ internal sealed class StateFilePathResolver
         this.relativePath = relativePath;
     }
 
-    /// <summary>Résout le chemin d'état et refuse une remontée hors de la racine de solution.</summary>
+    /// <summary>Résout le chemin d'état et refuse une destination hors de la racine physique de solution.</summary>
     /// <param name="solutionRoot">Racine absolue utilisée comme base de résolution.</param>
     /// <returns>Le chemin absolu normalisé du fichier d'état, sans créer de fichier ni de dossier.</returns>
     /// <exception cref="InvalidDataException">Le chemin normalisé sort de la racine de solution.</exception>
@@ -34,6 +34,20 @@ internal sealed class StateFilePathResolver
         if (relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
         {
             throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
+        }
+
+        string canonical = CanonicalPath.Resolve(resolved);
+        string canonicalRoot = CanonicalPath.Resolve(solutionRoot);
+        // La casse est déjà physique ; le séparateur distingue la racine d'un dossier frère au même préfixe.
+        string rootPrefix = canonicalRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (canonical != canonicalRoot && !canonical.StartsWith(rootPrefix, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
+        }
+
+        if (Path.GetRelativePath(canonical, CanonicalPath.Resolve(Path.Combine(AppContext.BaseDirectory, "appsettings.json"))) == ".")
+        {
+            throw new InvalidDataException("HookRunner:StateFilePath must be distinct from appsettings.json.");
         }
 
         return resolved;

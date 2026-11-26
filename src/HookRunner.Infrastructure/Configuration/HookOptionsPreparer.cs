@@ -7,8 +7,13 @@ namespace HookRunner.Infrastructure;
 /// <param name="stateFilePath">
 /// Chemin configuré du fichier d'état, résolu ultérieurement depuis la racine de solution.
 /// </param>
-public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateFilePath) : IHookOptionsPreparer
+/// <param name="maxBlockingRequests">Plafond global de demandes de correction.</param>
+/// <param name="hookLimits">Surcharges par nom de hook, sans distinction de casse.</param>
+public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateFilePath,
+    int maxBlockingRequests = 3, IReadOnlyDictionary<string, int>? hookLimits = null) : IHookOptionsPreparer
 {
+    private readonly Dictionary<string, int> limits = hookLimits is null
+        ? new(StringComparer.OrdinalIgnoreCase) : new(hookLimits, StringComparer.OrdinalIgnoreCase);
     /// <summary>
     /// Valide les options puis cherche la première solution ascendante depuis le dossier de l'agent.
     /// </summary>
@@ -42,8 +47,14 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
             throw new NotSupportedException("Project selection is not available yet.");
         }
 
+        int limit = limits.GetValueOrDefault(args.HookName, maxBlockingRequests);
+        if (limit < 0)
+        {
+            throw new InvalidDataException("MaxBlockingRequests must be non-negative.");
+        }
+
         string root = SolutionRootLocator.Find(invocation.WorkingDirectory);
-        return new HookOptions(timeout, root, root, [], statePath.Resolve(root));
+        return new HookOptions(timeout, root, root, [], statePath.Resolve(root), limit);
     }
 
     /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>

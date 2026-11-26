@@ -55,6 +55,7 @@ try {
         Invoke-Checked $dotnet @($helper, 'coverage', $RepositoryRoot)
     }
     if ($Task -in @('All', 'Quality')) {
+        Invoke-Checked $dotnet @($helper, 'try-catch', $RepositoryRoot)
         Invoke-Checked $dotnet @('format', 'HookRunner.slnx', '--no-restore', '--verify-no-changes', '--severity', 'info', '--report', "$artifacts/format.json")
         Invoke-Checked $dotnet @($helper, 'docs', $RepositoryRoot)
         & "$PSScriptRoot/install-ci-tools.ps1" -Tools actionlint

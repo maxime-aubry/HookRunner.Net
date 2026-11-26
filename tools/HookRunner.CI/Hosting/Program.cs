@@ -6,9 +6,9 @@ namespace HookRunner.CI;
 internal static class Program
 {
     /// <summary>
-    /// Route la commande CI vers le contrôle de couverture, d'audit ou de liens de documentation.
+    /// Route la commande CI vers le contrôle de couverture, d'audit, de liens ou de structure des interceptions.
     /// </summary>
-    /// <param name="args">coverage ou docs suivi de la racine du dépôt, ou audit suivi du rapport JSON.</param>
+    /// <param name="args">coverage, docs ou try-catch suivi de la racine du dépôt, ou audit suivi du rapport JSON.</param>
     /// <returns>
     /// 0 si le contrôle réussit, 1 s'il échoue ou rencontre une erreur de données prise en charge.
     /// </returns>
@@ -25,7 +25,8 @@ internal static class Program
                 ["coverage", string root] => CoverageCheck.Run(Path.GetFullPath(root)),
                 ["audit", string path] => AuditCheck.Run(path),
                 ["docs", string root] => DocumentationLinkCheck.Run(Path.GetFullPath(root)),
-                _ => throw new ArgumentException("Usage: HookRunner.CI coverage|docs <repository> OR audit <report.json>"),
+                ["try-catch", string root] => TryCatchCheck.Run(Path.GetFullPath(root)),
+                _ => throw new ArgumentException("Usage: HookRunner.CI coverage|docs|try-catch <repository> OR audit <report.json>"),
             };
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or JsonException or InvalidOperationException or ArgumentException or KeyNotFoundException or BadImageFormatException)

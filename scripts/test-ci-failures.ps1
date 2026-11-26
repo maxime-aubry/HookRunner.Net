@@ -44,6 +44,22 @@ namespace HookRunner.ArchitectureTests;
 
 public sealed class FailureProbe
 {
+    public void Fails()
+    {
+        int value = 0;
+        try { _ = value; }
+        catch { throw; }
+    }
+}
+'@)
+    Expect-Failure 'try-catch' @('tools/HookRunner.CI/bin/Release/net11.0/HookRunner.CI.dll', 'try-catch', $fixture) 'HR0001'
+    Remove-Item -LiteralPath $probe
+
+    [IO.File]::WriteAllText((Join-Path $fixture $probe), @'
+namespace HookRunner.ArchitectureTests;
+
+public sealed class FailureProbe
+{
     [Fact]
     public void Fails() => Assert.Fail("Intentional CI failure probe");
 }

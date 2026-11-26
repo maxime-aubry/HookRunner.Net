@@ -28,6 +28,8 @@ Other bots must use ordinary names until a specific exception is agreed.
 
 ## Local setup and checks
 
+Apply [coding standards](CODING_STANDARDS.md) when writing and reviewing C# code.
+
 Keep C# files grouped by responsibility inside their existing architecture layer.
 Application contains use cases and execution contracts; Infrastructure implements
 the adapters; Cli composes services and handles entry points. Put each top-level

@@ -27,20 +27,30 @@ public sealed class FileHookStateStore : IHookStateStore
             new HookIdentity(CanonicalPath.Resolve(identity.SolutionRoot),
                 identity.Agent, identity.SessionId, identity.HookName).Normalize()))));
         FileStream identityLock = await StateFileLock.AcquireAsync(path + "." + key + ".lock", cancellationToken).ConfigureAwait(false);
-        StateSession session;
+        return await OpenLockedSessionAsync(path, key, identityLock, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Transfère le verrou à la session ouverte, ou le libère si son initialisation échoue.</summary>
+    /// <param name="path">Chemin canonique du document partagé.</param>
+    /// <param name="key">Clé normalisée du compteur à lire.</param>
+    /// <param name="identityLock">Verrou déjà acquis dont la propriété doit être transférée.</param>
+    /// <param name="cancellationToken">Annulation de l'attente du document et de sa lecture.</param>
+    /// <returns>La session initialisée, propriétaire du verrou d'identité.</returns>
+    /// <remarks>Les erreurs d'initialisation remontent après libération du verrou d'identité.</remarks>
+    private static async Task<StateSession> OpenLockedSessionAsync(
+        string path, string key, FileStream identityLock, CancellationToken cancellationToken)
+    {
         try
         {
             await using FileStream documentLock = await StateFileLock.AcquireAsync(path + ".lock", cancellationToken).ConfigureAwait(false);
             StateDocument document = await ReadOrCreateAsync(path, cancellationToken).ConfigureAwait(false);
-            session = new StateSession(path, key, document.Counters.GetValueOrDefault(key), identityLock);
+            return new StateSession(path, key, document.Counters.GetValueOrDefault(key), identityLock);
         }
         catch
         {
             await identityLock.DisposeAsync().ConfigureAwait(false);
             throw;
         }
-
-        return session;
     }
 
     /// <summary>Charge un document strictement validé ou crée uniquement un fichier absent.</summary>

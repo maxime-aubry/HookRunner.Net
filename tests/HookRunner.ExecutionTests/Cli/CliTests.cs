@@ -44,6 +44,16 @@ public sealed class CliTests
         using ConfigurationFile configuration = new(content);
         using ConsoleCapture console = new(EventJson(AppContext.BaseDirectory));
         File.WriteAllText(solution, "<Solution />");
+        await AssertConfigurationIsProtectedAsync(solution, content, console);
+    }
+
+    /// <summary>Vérifie le refus de remplacer la configuration et garantit la suppression de la solution créée.</summary>
+    /// <param name="solution">Fichier de solution temporaire déjà écrit.</param>
+    /// <param name="content">Contenu de configuration qui doit être conservé.</param>
+    /// <param name="console">Capture des diagnostics du scénario.</param>
+    /// <returns>Une tâche représentant les assertions et le nettoyage de la solution.</returns>
+    private static async Task AssertConfigurationIsProtectedAsync(string solution, string content, ConsoleCapture console)
+    {
         try
         {
             int exit = await HookRunnerHost.RunAsync(["execute", "hook", "--agent", "codex"],

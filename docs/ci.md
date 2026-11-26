@@ -35,7 +35,7 @@ The exact SDK comes from `global.json`, not the runner's preinstalled default.
 | Available tests and Git-hook integration scenarios | xUnit/VSTest, Bash, PowerShell | Yes | `BuildTest` |
 | Lines and branches per production assembly | Coverlet + independent PDB gate | Yes when measurable | `BuildTest` |
 | Formatting and unused imports | `dotnet format --verify-no-changes --severity info` | Yes | `Quality` |
-| Try/catch as the sole function-body statement, ending with its final catch | CI helper + SDK Roslyn syntax parser (`HR0001`) | Yes | `Quality` |
+| Try with its catch/finally clauses as the sole function-body statement | CI helper + SDK Roslyn syntax parser (`HR0001`) | Yes | `Quality` |
 | Workflow syntax and expressions | actionlint | Yes | `Quality` |
 | Local documentation file links | CI helper | Yes | `Quality` |
 | High/critical direct and transitive vulnerabilities | NuGet audit + JSON gate | Yes | `Security` |

@@ -268,6 +268,25 @@ public sealed class CounterTests
         Task<RunHookResponse> waiting = CreateUseCase(secondExecutor, secondDiagnostics)
             .ExecuteAsync(request, TestContext.Current.CancellationToken);
         bool overlapped = waitingStarted.Task.IsCompleted;
+        await AssertIndependentInvocationAsync(fixture, release, running, waiting);
+
+        Assert.False(overlapped);
+        Assert.True(waitingStarted.Task.IsCompleted);
+        (int third, _) = await RunAsync(fixture, HookExecutionStatus.ValidationFailure);
+        (int fourth, _) = await RunAsync(fixture, HookExecutionStatus.ValidationFailure);
+        Assert.Equal(2, third);
+        Assert.Equal(0, fourth);
+    }
+
+    /// <summary>Vérifie une identité indépendante puis libère et attend les deux invocations concurrentes.</summary>
+    /// <param name="fixture">Solution et invocation de référence.</param>
+    /// <param name="release">Signal de fin de la première invocation.</param>
+    /// <param name="running">Première invocation maintenant le verrou.</param>
+    /// <param name="waiting">Deuxième invocation attendant la même identité.</param>
+    /// <returns>Une tâche terminée après les assertions et la fin des deux invocations.</returns>
+    private static async Task AssertIndependentInvocationAsync(
+        SolutionFixture fixture, TaskCompletionSource release, Task<RunHookResponse> running, Task<RunHookResponse> waiting)
+    {
         try
         {
             (int independent, _) = await RunAsync(fixture, HookExecutionStatus.ValidationFailure,
@@ -281,12 +300,6 @@ public sealed class CounterTests
             await waiting;
         }
 
-        Assert.False(overlapped);
-        Assert.True(waitingStarted.Task.IsCompleted);
-        (int third, _) = await RunAsync(fixture, HookExecutionStatus.ValidationFailure);
-        (int fourth, _) = await RunAsync(fixture, HookExecutionStatus.ValidationFailure);
-        Assert.Equal(2, third);
-        Assert.Equal(0, fourth);
     }
 
     /// <summary>Les trois premières demandes bloquent, puis le hook continue avec une trace de plafond.</summary>

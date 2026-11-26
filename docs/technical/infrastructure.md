@@ -37,6 +37,11 @@ implémente `IHookStateStore` et retourne une session `IHookStateSession` possé
 le verrou d'identité jusqu'à sa libération. Le verrou couvre attente de résultat,
 arrêt du processus enfant et persistance. Un verrou de document distinct protège
 les lectures et fusions d'écriture ; il n'est pas conservé pendant le hook.
+`OpenLockedSessionAsync` prend en charge la libération du verrou d'identité si
+l'initialisation échoue. `ReadSessionAsync` possède le verrou de document pendant
+la lecture et la construction de la session. `WriteTemporaryAsync` garantit le
+nettoyage du temporaire après la tentative de publication. Ces fonctions isolent
+les blocs de traitement d'erreur et de nettoyage sans élargir leur périmètre.
 
 [CanonicalPath](../../src/HookRunner.Infrastructure/Storage/CanonicalPath.cs)
 résout les composants symboliques et retrouve l'orthographe physique de chaque
@@ -54,6 +59,9 @@ verrouillage stables, sans compteur. Ils restent en place après libération pou
 partage sont retentées avec le token du budget global ; les autres erreurs
 remontent immédiatement à Context. L'état absent est créé sous verrou avant
 de lancer le hook. La configuration et l'état restent des fichiers distincts.
+[StateFileLock](../../src/HookRunner.Infrastructure/Storage/StateFileLock.cs)
+sépare la tentative d'acquisition (`TryAcquire`, dont le résultat null représente
+un conflit de partage reconnu) de l'attente annulable entre tentatives (`AcquireAsync`).
 
 ## ChildProcessCommand
 

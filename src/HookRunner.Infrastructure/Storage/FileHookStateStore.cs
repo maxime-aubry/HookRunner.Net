@@ -42,15 +42,27 @@ public sealed class FileHookStateStore : IHookStateStore
     {
         try
         {
-            await using FileStream documentLock = await StateFileLock.AcquireAsync(path + ".lock", cancellationToken).ConfigureAwait(false);
-            StateDocument document = await ReadOrCreateAsync(path, cancellationToken).ConfigureAwait(false);
-            return new StateSession(path, key, document.Counters.GetValueOrDefault(key), identityLock);
+            return await ReadSessionAsync(path, key, identityLock, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
             await identityLock.DisposeAsync().ConfigureAwait(false);
             throw;
         }
+    }
+
+    /// <summary>Initialise une session en conservant le verrou de document pendant toute sa construction.</summary>
+    /// <param name="path">Chemin canonique du document partagé.</param>
+    /// <param name="key">Clé normalisée du compteur à lire.</param>
+    /// <param name="identityLock">Verrou transféré à la session lors de sa construction.</param>
+    /// <param name="cancellationToken">Annulation de l'attente et de la lecture du document.</param>
+    /// <returns>La session construite après libération du verrou de document.</returns>
+    private static async Task<StateSession> ReadSessionAsync(
+        string path, string key, FileStream identityLock, CancellationToken cancellationToken)
+    {
+        await using FileStream documentLock = await StateFileLock.AcquireAsync(path + ".lock", cancellationToken).ConfigureAwait(false);
+        StateDocument document = await ReadOrCreateAsync(path, cancellationToken).ConfigureAwait(false);
+        return new StateSession(path, key, document.Counters.GetValueOrDefault(key), identityLock);
     }
 
     /// <summary>Charge un document strictement validé ou crée uniquement un fichier absent.</summary>
@@ -90,6 +102,18 @@ public sealed class FileHookStateStore : IHookStateStore
     private static async Task WriteAsync(string path, StateDocument document, CancellationToken cancellationToken)
     {
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        await WriteTemporaryAsync(path, temporary, document, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Publie le temporaire adjacent en garantissant son nettoyage après toute tentative d'écriture.</summary>
+    /// <param name="path">Destination protégée par le verrou du document.</param>
+    /// <param name="temporary">Nom unique du temporaire à créer puis nettoyer.</param>
+    /// <param name="document">État fusionné à publier.</param>
+    /// <param name="cancellationToken">Annulation de l'écriture et de la publication.</param>
+    /// <returns>Une tâche terminée après publication ou après nettoyage de l'écriture échouée.</returns>
+    private static async Task WriteTemporaryAsync(
+        string path, string temporary, StateDocument document, CancellationToken cancellationToken)
+    {
         try
         {
             await using (FileStream stream = new(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,

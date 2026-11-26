@@ -36,16 +36,16 @@ and which operations a handler covers when extracting methods.
 
 `HR0001`, implemented by
 [TryCatchCheck](tools/HookRunner.CI/Quality/Code/TryCatchCheck.cs), requires a
-try/catch to be the sole statement in its function body. Its first statement is
-the try, and its last clause is the final catch. Multiple catches and filters are
-allowed; a finally following a catch is rejected. Extract preparation, loops, and
+try statement, including its catch and finally clauses, to be the sole statement
+in its function body. Multiple catches, filters, and finally blocks are allowed.
+This applies equally to try/catch, try/finally, and try/catch/finally.
+Extract preparation, loops, and
 subsequent work into appropriately named functions instead of placing them outside
 the interception or widening its scope indiscriminately.
 
 The check covers C# methods, constructors, operators, accessors, local functions,
 and block-bodied lambdas or anonymous methods. Nested functions are checked
-independently. A top-level try/catch must be extracted into a function. Simple
-try/finally statements without a catch are outside this rule.
+independently. A top-level try/catch/finally must be extracted into a function.
 
 The check parses C# syntax rather than matching text, so comments and strings do
 not count as code. It scans repository C# files outside `bin`, `obj`, `artifacts`,

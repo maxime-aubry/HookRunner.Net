@@ -72,6 +72,13 @@ vérifie séparément le format NuGet et la politique de sévérité.
 [CommandTests](../../tests/HookRunner.CITests/Quality/CommandTests.cs)
 vérifie le code `1` et les diagnostics des commandes réelles pour les inventaires
 incomplets et les rapports d'audit invalides.
+[TryCatchTests](../../tests/HookRunner.CITests/Quality/TryCatchTests.cs)
+exécute la commande `try-catch` sur des sources conformes et non conformes.
+Les scénarios couvrent les clauses `finally` autorisées, les instructions avant
+ou après un bloc, les imbrications, fonctions locales, lambdas, constructeurs,
+accesseurs, chaînes et commentaires, erreurs de syntaxe, symboles `DEBUG` et
+`TRACE`, ainsi que le parcours des sources hors sorties générées. Les assertions
+portent sur le code de sortie et les diagnostics de la commande réelle.
 
 ## Consommateur de test
 

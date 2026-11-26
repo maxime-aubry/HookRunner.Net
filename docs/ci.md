@@ -129,6 +129,9 @@ checks independently. A separate probe changes Cli to an executable to verify
 that its class-library constraint is enforced.
 Production probe types and members include XML documentation so compilation
 reaches the intended analyzer, architecture, or coverage check.
+The branch-coverage probe builds a dedicated assembly and test project in its
+own fixture root. Its gate must report covered lines and an uncovered branch,
+independently of the business code present in the production assemblies.
 
 For dependency changes, update central versions, run `dotnet restore` without
 locked mode to regenerate locks, review lock diffs, then run full validation.

@@ -11,6 +11,9 @@ selon le premier argument. Il libère le conteneur de manière asynchrone.
 Toute exception, y compris lors de cette libération, est diagnostiquée sur
 stderr et donne le code `2`.
 
+`RunAsync` se consacre à cette gestion d'erreur. `RunComposedAsync` possède
+la composition, le routage et la libération, tous couverts par le même `catch`.
+
 `BuildServiceProvider` enregistre l'exécuteur isolé, le contexte transitoire,
 le cas d'usage et un préparateur d'options à résolution différée. Le callback
 du consommateur s'exécute après ces valeurs par défaut et peut les remplacer.
@@ -49,6 +52,9 @@ exige le marqueur interne et deux chemins. `ExecuteHookAsync` désérialise
 la requête préparée, résout la stratégie et l'appelle directement. Il ne lit
 ni stdin ni la configuration et ne recrée pas d'orchestration applicative.
 Les erreurs deviennent un résultat technique versionné.
+La lecture JSON est isolée dans `ReadRequestAsync` ; `ExecuteRequestAsync`
+sélectionne et exécute la stratégie. `ExecuteHookAsync` se consacre à la
+traduction des exceptions.
 
 `RunAsync` écrit ce résultat et rend `0` si l'écriture réussit. Une erreur
 d'écriture remonte à l'hôte et donne `2`. Les contrats XML des méthodes

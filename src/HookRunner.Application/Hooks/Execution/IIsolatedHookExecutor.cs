@@ -15,8 +15,12 @@ public interface IIsolatedHookExecutor
     /// </param>
     /// <returns>Une tâche contenant le statut du hook et son éventuel diagnostic.</returns>
     /// <remarks>
-    /// Les erreurs de lancement, de transport et d'annulation peuvent être propagées ; le contexte les traduit en
-    /// code de sortie technique.
+    /// L'annulation demande l'arrêt forcé immédiat du hook isolé, même si la stratégie ignore son token.
+    /// L'adaptateur confirme l'arrêt dans un délai technique fini avant de terminer cette tâche.
+    /// Une OperationCanceledException portant exactement le token reçu signifie que l'arrêt est confirmé
+    /// (ou qu'aucun enfant n'a démarré). Une confirmation échouée doit lever une autre exception, même si son
+    /// délai technique expire. Un résultat retourné garantit également la fin de l'exécution isolée.
+    /// Les erreurs de lancement, de transport et de confirmation remontent au contexte comme erreurs techniques.
     /// </remarks>
     Task<HookExecutionResult> ExecuteAsync(IsolatedHookRequest request, CancellationToken cancellationToken);
 }

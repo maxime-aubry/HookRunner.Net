@@ -119,11 +119,11 @@ public sealed class UseCaseTests
     }
 
     /// <summary>
-    /// Vérifie que la première solution ascendante gagne et que le timeout de commande prime sur la configuration.
+    /// Vérifie que la première solution ascendante gagne.
     /// </summary>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
     [Fact]
-    public async Task TheNearestSolutionWinsAndCommandTimeoutOverridesConfiguration()
+    public async Task TheNearestSolutionWins()
     {
         using SolutionFixture fixture = new();
         string nearest = Path.Combine(fixture.Root, "agent");
@@ -133,11 +133,27 @@ public sealed class UseCaseTests
         RunHookUseCase useCase = new([new TestHook("chosen")],
             new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
 
-        await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", 17, []), fixture.Invocation),
+        await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", null, []), fixture.Invocation),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(nearest, executor.Request!.Options.SolutionRoot);
-        Assert.Equal(17, executor.Request.Options.TimeoutSeconds);
+    }
+
+    /// <summary>Vérifie que le timeout de la commande remplace la configuration dans la requête isolée.</summary>
+    /// <returns>Une tâche représentant le scénario de préparation et ses assertions.</returns>
+    [Fact]
+    public async Task CommandTimeoutOverridesConfiguration()
+    {
+        using SolutionFixture fixture = new();
+        RecordingExecutor executor = new();
+        using StringWriter diagnostics = new();
+        RunHookUseCase useCase = new([new TestHook("chosen")],
+            new HookOptionsPreparer(120, "Hooks/state.json"), new Context(executor, diagnostics));
+
+        await useCase.ExecuteAsync(new RunHookRequest(new RunHookArgs("chosen", 17, []), fixture.Invocation),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(17, executor.Request!.Options.TimeoutSeconds);
     }
 
     /// <summary>Vérifie que l'absence de solution ascendante empêche tout appel de l'exécuteur.</summary>

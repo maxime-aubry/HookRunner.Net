@@ -22,33 +22,17 @@ public sealed class InspectHook(ConsumerDependency dependency) : HookStrategy
     /// </param>
     /// <returns>Une tâche écrivant l'observation JSON au chemin observation_path de l'événement.</returns>
     /// <remarks>
-    /// HOOKRUNNER_TEST_MODE peut demander une attente annulable avec publication du PID, une sortie immédiate 23
-    /// ou une exception technique. Le parcours normal écrit aussi sur stdout pour vérifier son drainage par le
-    /// superviseur.
+    /// HOOKRUNNER_TEST_MODE peut demander une attente annulable ou un blocage C# ignorant l'annulation avec
+    /// publication du PID, une sortie immédiate 23 ou une exception technique. Le parcours normal écrit sur
+    /// stdout pour vérifier son drainage par le superviseur.
     /// </remarks>
     /// <exception cref="InvalidOperationException">Le mode technical-failure simule une panne du hook.</exception>
     public override async Task ExecuteAsync(InvocationData invocation, HookOptions options, CancellationToken cancellationToken)
     {
         using JsonDocument document = JsonDocument.Parse(invocation.OriginalJson);
         string output = document.RootElement.GetProperty("observation_path").GetString()!;
-        if (Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE") == "wait")
-        {
-            string ready = output + ".ready";
-            await File.WriteAllTextAsync(ready, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
-            File.Move(ready, output);
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-        }
-
-        if (Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE") == "unexpected-exit")
-        {
-            Environment.Exit(23);
-        }
-
-        if (Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE") == "technical-failure")
-        {
-            throw new InvalidOperationException("Consumer technical failure.");
-        }
-
+        string? mode = Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_MODE");
+        await HookFailureSimulation.ApplyAsync(mode, output, cancellationToken);
         string json = JsonSerializer.Serialize(new Observation(Environment.ProcessId, dependency.Value, invocation, options));
         await File.WriteAllTextAsync(output, json, cancellationToken);
         Console.WriteLine("A consumer hook can write arbitrary stdout.");

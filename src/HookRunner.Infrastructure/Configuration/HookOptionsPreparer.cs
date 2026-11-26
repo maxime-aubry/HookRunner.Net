@@ -35,49 +35,29 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(invocation);
-        int timeout = args.TimeoutSeconds ?? defaultTimeoutSeconds;
-        if (timeout <= 0)
-        {
-            throw new InvalidDataException("TimeoutSeconds must be a positive integer.");
-        }
-
-        if (string.IsNullOrWhiteSpace(stateFilePath))
-        {
-            throw new InvalidDataException("HookRunner:StateFilePath is required.");
-        }
-
-        if (Path.IsPathRooted(stateFilePath))
-        {
-            throw new InvalidDataException("HookRunner:StateFilePath must be relative to the solution root.");
-        }
-
+        int timeout = ResolveTimeoutSeconds(args.TimeoutSeconds);
+        StateFilePathResolver statePath = new(stateFilePath);
         if (args.Projects.Count != 0)
         {
             throw new NotSupportedException("Project selection is not available yet.");
         }
 
-        DirectoryInfo? directory = new(invocation.WorkingDirectory);
-        while (directory is not null)
+        string root = SolutionRootLocator.Find(invocation.WorkingDirectory);
+        return new HookOptions(timeout, root, root, [], statePath.Resolve(root));
+    }
+
+    /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>
+    /// <param name="overrideSeconds">Timeout demandé par la commande ; null conserve la configuration.</param>
+    /// <returns>Le budget effectif en secondes, strictement positif.</returns>
+    /// <exception cref="InvalidDataException">Le timeout effectif est nul ou négatif.</exception>
+    private int ResolveTimeoutSeconds(int? overrideSeconds)
+    {
+        int timeout = overrideSeconds ?? defaultTimeoutSeconds;
+        if (timeout <= 0)
         {
-            if (directory.EnumerateFiles().Any(file =>
-                file.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase)
-                || file.Extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase)))
-            {
-                string root = directory.FullName;
-                string resolvedStatePath = Path.GetFullPath(stateFilePath, root);
-                string relativeStatePath = Path.GetRelativePath(root, resolvedStatePath);
-                if (relativeStatePath == ".."
-                    || relativeStatePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
-                }
-
-                return new HookOptions(timeout, root, root, [], resolvedStatePath);
-            }
-
-            directory = directory.Parent;
+            throw new InvalidDataException("TimeoutSeconds must be a positive integer.");
         }
 
-        throw new DirectoryNotFoundException("No solution found above the agent working directory.");
+        return timeout;
     }
 }

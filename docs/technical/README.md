@@ -111,6 +111,8 @@ dans le superviseur.
 | Arguments, événement ou configuration invalides | Diagnostic `HookRunner: ...`, code `2`, sans exécution du hook. |
 | Résultat enfant manquant ou invalide | Erreur technique, code `2`. |
 | Annulation externe pendant l'attente de l'enfant | Tentative d'arrêt de son arbre de processus, diagnostic, code `2`. |
+| Timeout global avec arrêt confirmé | Arrêt forcé, trace sur stderr, code `0`, résultat métier tardif ignoré. |
+| Échec de confirmation d'arrêt | Diagnostic technique, code `2`. |
 | `ValidationFailure` reçu par le contexte | Diagnostic et code `2`, comme les autres échecs. |
 
 Le code `0` de l'enfant indique que le fichier de résultat a pu être écrit ;
@@ -118,9 +120,11 @@ le statut du hook se lit dans ce fichier. Il peut donc signaler un échec alors
 que le processus enfant a quitté avec `0`.
 
 Seul l'agent `codex` est accepté. La sélection `--projects` est analysée puis
-refusée. `TimeoutSeconds` et `StateFilePath` sont préparés et transmis, mais
-aucun budget de timeout n'est déclenché automatiquement et aucun état n'est
-persisté. Les compteurs, le blocage métier, l'adaptation Claude, les services
+refusée. `TimeoutSeconds` est préparé puis appliqué par Context comme budget
+unique couvrant le démarrage et l'exécution isolée. La confirmation d'arrêt
+utilise un délai technique distinct de cinq secondes. `StateFilePath` est
+préparé et transmis, mais aucun état n'est persisté.
+Les compteurs, le blocage métier, l'adaptation Claude, les services
 de commandes et de prompts restent à implémenter. La présence d'un modèle
 ou d'une valeur d'énumération ne signifie pas que le traitement associé existe.
 

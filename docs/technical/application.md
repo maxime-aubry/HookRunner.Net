@@ -64,7 +64,8 @@ La résolution effective des projets cibles n'est pas encore implémentée.
 | `SolutionRoot` | `string` | Premier dossier ascendant contenant une solution. |
 | `DefaultWorkingDirectory` | `string` | Dossier de lancement de l'enfant ; actuellement égal à `SolutionRoot`. |
 | `Projects` | `IReadOnlyList<TargetProject>` | Projets résolus ; liste vide dans le parcours superviseur actuel. |
-| `StateFilePath` | `string` | Chemin absolu préparé pour l'état futur ; aucun fichier n'est lu ou écrit par ce modèle. |
+| `StateFilePath` | `string` | Chemin absolu du fichier partagé de compteurs. |
+| `MaxBlockingRequests` | `int` | Plafond effectif de demandes, trois par défaut ; zéro désactive les blocages métier. |
 
 ### IHookOptionsPreparer.Prepare(RunHookArgs args, InvocationData invocation)
 
@@ -169,7 +170,7 @@ canonique fourni par la stratégie sélectionnée, et non son instance.
 | Valeur | Nombre | Sens et prise en charge actuelle |
 | --- | --- | --- |
 | `Success` | `0` | Fin normale du hook. |
-| `ValidationFailure` | `1` | Statut réservé à la validation métier ; accepté par le protocole, mais non produit par le point d'entrée enfant actuel. |
+| `ValidationFailure` | `1` | Demande de correction produite par une `HookValidationException`. |
 | `TechnicalFailure` | `2` | Exception technique pendant la lecture, la sélection ou l'exécution dans l'enfant. |
 
 `HookExecutionResult(HookExecutionStatus Status, string? Diagnostic)` est le
@@ -202,7 +203,7 @@ celui de l'exécution. Un résultat retourné garantit aussi la fin du hook isol
 [Source](../../src/HookRunner.Application/Hooks/Execution/Context.cs).
 
 Classe publique scellée, construite avec `IIsolatedHookExecutor executor` et
-`TextWriter diagnostics`, avec un `TimeProvider` facultatif pour contrôler le
+`TextWriter diagnostics` et `IHookStateStore stateStore`, avec un `TimeProvider` facultatif pour contrôler le
 temps (horloge système par défaut). Elle conserve une requête privée nullable entre
 `SetStrategy` et `ExecuteAsync`. Dans la composition par défaut, sa durée de
 vie DI est transitoire et les diagnostics sont dirigés vers `Console.Error`.
@@ -224,7 +225,7 @@ Ces modules restent internes ; les contrats publics du contexte sont conservés.
 
 Renvoie `Task<int>`. Exige une requête préparée et refuse une annulation
 extérieure préalable avant tout lancement. Une seule échéance monotone démarre
-avant l'exécuteur : le démarrage de l'enfant et l'exécution partagent le budget
+avant l'attente du verrou : attente, démarrage de l'enfant et exécution partagent le budget
 de `HookOptions.TimeoutSeconds`. Son token est lié à l'annulation extérieure.
 À l'échéance, l'exécuteur force l'arrêt et en confirme la terminaison.
 
@@ -232,7 +233,8 @@ Un timeout confirmé écrit uniquement une trace et renvoie `0`. Un verdict
 métier tardif est ignoré, même si le rappel de minuterie a été retardé.
 L'annulation extérieure et l'échec de confirmation donnent un diagnostic et `2`.
 Avant l'échéance, `Success` écrit `Hook '<nom>' succeeded.` et renvoie `0` ;
-les autres statuts écrivent leur diagnostic et renvoient `2`.
+les demandes sous plafond écrivent leurs consignes et renvoient `2`. Au plafond,
+une demande produit seulement une trace et `0`. Une erreur technique garde son diagnostic et `2`.
 
 [`InvocationDeadline`](../../src/HookRunner.Application/Hooks/Execution/InvocationDeadline.cs)
 conserve l'instant monotone de départ. Pour les grands entiers positifs, elle
@@ -240,7 +242,24 @@ réarme une minuterie avec le budget restant sans renouveler l'échéance.
 
 Les exceptions, y compris l'absence de stratégie et l'annulation, sont
 interceptées : la méthode écrit `Hook execution failed: <message>` et renvoie
-`2`. Elle ne gère encore ni compteur, ni persistance,
-ni distinction de code entre validation et panne technique. Le writer doit
+`2`. Une session de stockage exclusive est ouverte avant le hook : un succès
+persiste zéro, une demande consomme le plafond et les autres issues conservent
+le compteur. Le writer doit
 rester utilisable : une exception lors de l'écriture dans le bloc `catch`
 peut encore remonter à l'appelant.
+
+## Stockage et règles de Domain
+
+[`IHookStateStore`](../../src/HookRunner.Application/Hooks/Storage/IHookStateStore.cs)
+ouvre une session exclusive pour une `HookIdentity` ;
+[`IHookStateSession`](../../src/HookRunner.Application/Hooks/Storage/IHookStateSession.cs)
+expose le compteur et sa sauvegarde atomique, et libère l'identité par `DisposeAsync`.
+Application ne connaît ni fichier JSON ni mécanisme de verrouillage natif.
+
+Domain porte [`RequestCounter`](../../src/HookRunner.Domain/Counters/RequestCounter.cs),
+qui consomme une unité sous le plafond sans déborder, et
+[`HookIdentity`](../../src/HookRunner.Domain/Counters/HookIdentity.cs), qui conserve
+racine physique, agent, session et nom du hook normalisé sans distinction de casse.
+[`HookValidationException`](../../src/HookRunner.Domain/Validation/HookValidationException.cs)
+transporte diagnostics et consignes métier. `HookExecutionResult.FromException`
+traduit cette exception en `ValidationFailure`, les autres en `TechnicalFailure`.

@@ -7,8 +7,9 @@ internal sealed class ExecutionReporter(TextWriter diagnostics)
     /// <summary>Écrit le verdict du hook, ou un diagnostic de timeout lorsque le résultat est null.</summary>
     /// <param name="request">Invocation préparée fournissant le nom du hook et son budget.</param>
     /// <param name="result">Résultat de l'exécution ; null représente un timeout avec arrêt confirmé.</param>
-    /// <returns>0 pour un succès ou un timeout confirmé ; 2 pour un statut d'échec.</returns>
-    public int Report(IsolatedHookRequest request, HookExecutionResult? result)
+    /// <param name="shouldBlock">Indique si la demande métier peut encore consommer le plafond.</param>
+    /// <returns>0 pour un succès, un plafond atteint ou un timeout confirmé ; 2 pour les autres échecs.</returns>
+    public int Report(IsolatedHookRequest request, HookExecutionResult? result, bool shouldBlock)
     {
         if (result is null)
         {
@@ -20,6 +21,17 @@ internal sealed class ExecutionReporter(TextWriter diagnostics)
         {
             diagnostics.WriteLine($"Hook '{request.HookName}' succeeded.");
             return 0;
+        }
+
+        if (result.Status == HookExecutionStatus.ValidationFailure)
+        {
+            diagnostics.WriteLine(shouldBlock
+                ? $"Hook '{request.HookName}' requested corrections."
+                : $"Hook '{request.HookName}' reached its correction request limit.");
+            if (!shouldBlock)
+            {
+                return 0;
+            }
         }
 
         diagnostics.WriteLine(result.Diagnostic);

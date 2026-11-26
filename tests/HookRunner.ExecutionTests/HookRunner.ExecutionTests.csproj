@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/HookRunner.Domain/HookRunner.Domain.csproj" />
     <ProjectReference Include="../../fixtures/HookRunner.TestHost/HookRunner.TestHost.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/HookRunner.Application/HookRunner.Application.csproj" />
     <ProjectReference Include="../../src/HookRunner.Infrastructure/HookRunner.Infrastructure.csproj" />

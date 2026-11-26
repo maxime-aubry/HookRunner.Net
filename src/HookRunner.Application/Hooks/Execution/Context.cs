@@ -5,11 +5,12 @@ namespace HookRunner.Application;
 /// </summary>
 /// <param name="executor">Service d'exécution isolée utilisé pour lancer le hook.</param>
 /// <param name="diagnostics">Flux recevant les traces et diagnostics d'exécution.</param>
+/// <param name="stateStore">Stockage persistant des compteurs.</param>
 /// <param name="timeProvider">Horloge de supervision ; null utilise l'horloge système.</param>
-public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnostics, TimeProvider? timeProvider = null)
+public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnostics, IHookStateStore stateStore, TimeProvider? timeProvider = null)
 {
     private IsolatedHookRequest? request;
-    private readonly InvocationSupervisor supervisor = new(executor, timeProvider ?? TimeProvider.System);
+    private readonly InvocationSupervisor supervisor = new(executor, stateStore, timeProvider ?? TimeProvider.System);
     private readonly ExecutionReporter reporter = new(diagnostics);
 
     /// <summary>
@@ -32,13 +33,13 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
     /// Token d'annulation transmis aux opérations qui le prennent en charge.
     /// </param>
     /// <returns>
-    /// Une tâche donnant 0 en cas de succès ou de timeout avec arrêt confirmé, ou 2 pour un échec métier,
+    /// Une tâche donnant 0 en cas de succès, plafond atteint ou timeout avec arrêt confirmé, ou 2 pour une demande métier,
     /// technique, une annulation extérieure ou un contexte non préparé.
     /// </returns>
     /// <remarks>
     /// Le budget unique commence avant l'appel de l'exécuteur, qui doit forcer l'arrêt sur annulation et en
-    /// confirmer la terminaison dans un délai technique fini. Un résultat tardif est ignoré. Les règles de compteur
-    /// ne sont pas encore appliquées. Le contexte ne doit pas être partagé entre exécutions concurrentes.
+    /// confirmer la terminaison dans un délai technique fini. Un résultat tardif est ignoré. Le compteur est
+    /// persistant et seule une fin normale le remet à zéro. Le contexte ne doit pas être partagé entre exécutions concurrentes.
     /// </remarks>
     public async Task<int> ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -59,7 +60,7 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
     private async Task<int> ExecutePreparedAsync(CancellationToken cancellationToken)
     {
         IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
-        HookExecutionResult? result = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
-        return reporter.Report(execution, result);
+        (HookExecutionResult? result, bool shouldBlock) = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
+        return reporter.Report(execution, result, shouldBlock);
     }
 }

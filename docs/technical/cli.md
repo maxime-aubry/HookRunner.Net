@@ -42,7 +42,7 @@ La commande et la configuration utilisent la même validation.
 [HookRunnerConfiguration](../../src/HookRunner.Cli/Configuration/HookRunnerConfiguration.cs)
 charge obligatoirement `appsettings.json` depuis `AppContext.BaseDirectory`,
 indépendamment du dossier de lancement. `Load` lit le timeout, avec défaut
-à 120 secondes, et le chemin d'état. Un chemin absent sera refusé par le
+à 120 secondes, le chemin d'état, `MaxBlockingRequests` (défaut trois) et les surcharges `Hooks:<nom>:MaxBlockingRequests`. Les plafonds sont des entiers non négatifs. Toute surcharge de `StateFilePath` par hook est refusée. Un chemin absent sera refusé par le
 préparateur d'options ; la configuration est libérée après lecture.
 
 ## Point d'entrée enfant
@@ -51,7 +51,7 @@ préparateur d'options ; la configuration est libérée après lecture.
 exige le marqueur interne et deux chemins. `ExecuteHookAsync` désérialise
 la requête préparée, résout la stratégie et l'appelle directement. Il ne lit
 ni stdin ni la configuration et ne recrée pas d'orchestration applicative.
-Les erreurs deviennent un résultat technique versionné.
+Une `HookValidationException` devient un résultat de validation ; les autres erreurs deviennent un résultat technique versionné.
 La lecture JSON est isolée dans `ReadRequestAsync` ; `ExecuteRequestAsync`
 sélectionne et exécute la stratégie. `ExecuteHookAsync` se consacre à la
 traduction des exceptions.

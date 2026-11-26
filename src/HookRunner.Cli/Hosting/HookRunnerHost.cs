@@ -89,12 +89,15 @@ public static class HookRunnerHost
     {
         ServiceCollection services = new();
         services.AddSingleton<IIsolatedHookExecutor>(new ProcessHookExecutor(childProcess ?? ChildProcessCommand.ForCurrentProcess()));
-        services.AddTransient(provider => new Context(provider.GetRequiredService<IIsolatedHookExecutor>(), Console.Error));
+        services.AddSingleton<IHookStateStore, FileHookStateStore>();
+        services.AddTransient(provider => new Context(provider.GetRequiredService<IIsolatedHookExecutor>(), Console.Error,
+            provider.GetRequiredService<IHookStateStore>()));
         services.AddTransient<RunHookUseCase>();
         services.AddSingleton<IHookOptionsPreparer>(_ =>
         {
             HookRunnerConfiguration configuration = HookRunnerConfiguration.Load();
-            return new HookOptionsPreparer(configuration.TimeoutSeconds, configuration.StateFilePath);
+            return new HookOptionsPreparer(configuration.TimeoutSeconds, configuration.StateFilePath,
+                configuration.MaxBlockingRequests, configuration.HookLimits);
         });
         configureServices(services);
         return services.BuildServiceProvider();

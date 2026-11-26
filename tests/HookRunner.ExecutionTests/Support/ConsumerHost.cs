@@ -6,9 +6,10 @@ namespace HookRunner.ExecutionTests;
 /// <summary>Exécute une copie isolée du consommateur et capture ses flux avec un nettoyage garanti.</summary>
 /// <param name="directory">Dossier de travail du scénario, recevant une copie du programme sous compiled-host.</param>
 /// <param name="useAppHost">True utilise l'apphost natif ; false lance l'assembly avec dotnet.</param>
-internal sealed class ConsumerHost(string directory, bool useAppHost = false)
+/// <param name="instrument">True conserve l'instrumentation des assemblies du programme de tests.</param>
+internal sealed class ConsumerHost(string directory, bool useAppHost = false, bool instrument = true)
 {
-    private readonly ChildProcessCommand command = ConsumerProgram.CopyTo(Path.Combine(directory, "compiled-host"), useAppHost);
+    private readonly ChildProcessCommand command = ConsumerProgram.CopyTo(Path.Combine(directory, "compiled-host"), useAppHost, instrument);
 
     /// <summary>Lance le consommateur isolé, fournit son entrée et capture sa sortie avec un délai de trente secondes.</summary>
     /// <param name="arguments">Arguments applicatifs ajoutés à la commande du consommateur compilé.</param>

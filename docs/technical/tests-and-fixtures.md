@@ -39,6 +39,25 @@ conserve le PID, le code de sortie et les flux capturés. `RunningInvocation` ga
 l'annulation et l'attente finale des scénarios de processus, même après une
 assertion en échec ; `ConsumerProcessObservation` attend la publication du PID.
 
+## Compteurs et concurrence
+
+[`CounterTests`](../../tests/HookRunner.ExecutionTests/Application/CounterTests.cs)
+couvre plafonds, état corrompu ou inaccessible, identité, chemins physiques,
+sérialisation et timeout pendant l'attente via `RunHookUseCase`.
+[`CounterDomainTests`](../../tests/HookRunner.ExecutionTests/Application/CounterDomainTests.cs)
+couvre les règles pures et les exceptions métier.
+[`HostCounterTests`](../../tests/HookRunner.ExecutionTests/Integration/HostCounterTests.cs)
+vérifie persistance entre lancements, surcharges et concurrence interprocessus.
+[`DirectoryLink`](../../tests/HookRunner.ExecutionTests/Support/DirectoryLink.cs)
+crée un lien symbolique Unix ou une jonction Windows pour tester les alias physiques.
+
+La collection
+[`ProcessTestsGroup`](../../tests/HookRunner.ExecutionTests/Support/ProcessTestsGroup.cs)
+sérialise les suites de processus instrumentés pour éviter les collisions à la
+publication des rapports Coverlet. Le scénario explicitement concurrent utilise
+les assemblies de la fixture non instrumentées ; les autres tests exécutent le
+même code avec couverture. Aucun code de production n'est exclu de la mesure.
+
 ## Tests des politiques
 
 [LayerTests](../../tests/HookRunner.ArchitectureTests/Dependencies/LayerTests.cs)

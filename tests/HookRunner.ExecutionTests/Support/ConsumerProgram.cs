@@ -9,6 +9,7 @@ internal static class ConsumerProgram
     /// <param name="directory">
     /// Dossier de destination créé si nécessaire ; les fichiers existants sont remplacés.
     /// </param>
+    /// <param name="instrument">True copie les assemblies instrumentées du programme de tests.</param>
     /// <param name="useAppHost">
     /// True pour appeler l'apphost natif ; false pour utiliser dotnet avec le DLL.
     /// </param>
@@ -17,7 +18,7 @@ internal static class ConsumerProgram
     /// Les assemblies HookRunner du dossier de tests remplacent celles de compilation afin de préserver
     /// l'instrumentation Coverlet.
     /// </remarks>
-    public static ChildProcessCommand CopyTo(string directory, bool useAppHost)
+    public static ChildProcessCommand CopyTo(string directory, bool useAppHost, bool instrument = true)
     {
         string source = Path.GetDirectoryName(Command.Arguments[0])!;
         Directory.CreateDirectory(directory);
@@ -28,9 +29,12 @@ internal static class ConsumerProgram
 
         // Run the real supervisor and child with the assemblies under test,
         // including Coverlet instrumentation, instead of build-time copies.
-        foreach (string assembly in new[] { "HookRunner.Application.dll", "HookRunner.Infrastructure.dll", "HookRunner.Cli.dll" })
+        if (instrument)
         {
-            File.Copy(Path.Combine(AppContext.BaseDirectory, assembly), Path.Combine(directory, assembly), overwrite: true);
+            foreach (string assembly in new[] { "HookRunner.Domain.dll", "HookRunner.Application.dll", "HookRunner.Infrastructure.dll", "HookRunner.Cli.dll" })
+            {
+                File.Copy(Path.Combine(AppContext.BaseDirectory, assembly), Path.Combine(directory, assembly), overwrite: true);
+            }
         }
 
         return useAppHost

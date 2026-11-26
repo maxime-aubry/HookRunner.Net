@@ -10,9 +10,11 @@ namespace HookRunner.Application;
 /// <param name="DefaultWorkingDirectory">Dossier de travail utilisé pour lancer le hook isolé.</param>
 /// <param name="Projects">Projets cibles résolus ; liste vide en l'absence de sélection.</param>
 /// <param name="StateFilePath">Chemin du fichier d'état ; aucune persistance n'est effectuée par ce type.</param>
+/// <param name="MaxBlockingRequests">Plafond de demandes de correction depuis le dernier succès.</param>
 public sealed record HookOptions(
     int TimeoutSeconds,
     string SolutionRoot,
     string DefaultWorkingDirectory,
     IReadOnlyList<TargetProject> Projects,
-    string StateFilePath);
+    string StateFilePath,
+    int MaxBlockingRequests = 3);

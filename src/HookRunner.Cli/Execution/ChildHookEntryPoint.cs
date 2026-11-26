@@ -71,7 +71,8 @@ internal static class ChildHookEntryPoint
         }
         catch (Exception exception)
         {
-            return new ChildHookResult(ChildHookProtocol.Version, HookExecutionStatus.TechnicalFailure, exception.Message);
+            HookExecutionResult failure = HookExecutionResult.FromException(exception);
+            return new ChildHookResult(ChildHookProtocol.Version, failure.Status, failure.Diagnostic);
         }
     }
 

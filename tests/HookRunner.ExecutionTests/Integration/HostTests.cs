@@ -4,6 +4,7 @@ using HookRunner.Application;
 namespace HookRunner.ExecutionTests;
 
 /// <summary>Scénarios de bout en bout exécutant un véritable consommateur et son enfant.</summary>
+[Collection("Processes")]
 public sealed class HostTests
 {
     /// <summary>
@@ -109,7 +110,7 @@ public sealed class HostTests
         Assert.Equal(fixture.Root, options.SolutionRoot);
         Assert.Equal(fixture.Root, options.DefaultWorkingDirectory);
         Assert.Empty(options.Projects);
-        Assert.False(File.Exists(options.StateFilePath));
+        Assert.True(File.Exists(options.StateFilePath));
     }
 
 }

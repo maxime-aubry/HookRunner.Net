@@ -30,6 +30,31 @@ La recherche ascendante appartient à
 regroupe la validation du chemin configuré et son confinement dans la solution.
 Le préparateur conserve l'ordre des validations et assemble les options finales.
 
+## Persistance des compteurs
+
+[FileHookStateStore](../../src/HookRunner.Infrastructure/Storage/FileHookStateStore.cs)
+implémente `IHookStateStore` et retourne une session `IHookStateSession` possédant
+le verrou d'identité jusqu'à sa libération. Le verrou couvre attente de résultat,
+arrêt du processus enfant et persistance. Un verrou de document distinct protège
+les lectures et fusions d'écriture ; il n'est pas conservé pendant le hook.
+
+[CanonicalPath](../../src/HookRunner.Infrastructure/Storage/CanonicalPath.cs)
+résout les composants symboliques et retrouve l'orthographe physique de chaque
+composant existant, selon la sensibilité réelle du volume. Une empreinte
+SHA-256 de la racine physique, de l'agent, de la session et du nom de hook
+normalisé identifie chaque entrée. Les worktrees conservent leurs propres racines.
+Le document JSON versionné contient `Version` et `Counters`, un dictionnaire
+d'empreintes vers des entiers non négatifs. Les propriétés manquantes, inconnues,
+dupliquées, nulles ou invalides sont refusées sans réécrire le document.
+
+Chaque écriture utilise un temporaire adjacent, synchronisé sur disque puis
+renommé sur la destination. Les fichiers `.lock` adjacents sont des supports de
+verrouillage stables, sans compteur. Ils restent en place après libération pour
+éviter qu'un autre processus verrouille un inode différent. Les erreurs de
+partage sont retentées avec le token du budget global ; les autres erreurs
+remontent immédiatement à Context. L'état absent est créé sous verrou avant
+de lancer le hook. La configuration et l'état restent des fichiers distincts.
+
 ## ChildProcessCommand
 
 [Source](../../src/HookRunner.Infrastructure/Execution/ChildProcessCommand.cs).

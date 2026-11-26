@@ -10,6 +10,54 @@ namespace HookRunner.ExecutionTests;
 [Collection("Console")]
 public sealed class CliTests
 {
+    /// <summary>Une mauvaise configuration de plafond ou une surcharge d'état ne lance pas le hook.</summary>
+    /// <param name="settings">Section HookRunner invalide.</param>
+    /// <returns>Une tâche vérifiant diagnostic et absence d'exécution.</returns>
+    [Theory]
+    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"MaxBlockingRequests\":-1}")]
+    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"MaxBlockingRequests\":\"invalid\"}")]
+    [InlineData("{\"StateFilePath\":\"Hooks/state.json\",\"Hooks\":{\"hook\":{\"StateFilePath\":\"other.json\"}}}")]
+    public async Task InvalidCounterConfigurationPreventsExecution(string settings)
+    {
+        using SolutionFixture fixture = new();
+        using ConsoleCapture console = new(EventJson(fixture.Root));
+        using ConfigurationFile configuration = new("{\"HookRunner\":" + settings + "}");
+        CapturingExecutor executor = new();
+        int exit = await HookRunnerHost.RunAsync(["execute", "hook", "--agent", "codex"], services =>
+        {
+            services.AddSingleton<HookStrategy>(new ConsumerHook());
+            services.AddSingleton<IIsolatedHookExecutor>(executor);
+        }, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, exit);
+        Assert.NotEmpty(console.Error.ToString());
+        Assert.Null(executor.Request);
+    }
+
+    /// <summary>La configuration ne peut pas servir de fichier de compteurs.</summary>
+    /// <returns>Une tâche vérifiant le refus et la conservation exacte de la configuration.</returns>
+    [Fact]
+    public async Task StateCannotReplaceTheConfigurationFile()
+    {
+        string solution = Path.Combine(AppContext.BaseDirectory, "StateConfigurationConflict.slnx");
+        string content = "{\"HookRunner\":{\"StateFilePath\":\"appsettings.json\"}}";
+        using ConfigurationFile configuration = new(content);
+        using ConsoleCapture console = new(EventJson(AppContext.BaseDirectory));
+        File.WriteAllText(solution, "<Solution />");
+        try
+        {
+            int exit = await HookRunnerHost.RunAsync(["execute", "hook", "--agent", "codex"],
+                services => services.AddSingleton<HookStrategy>(new ConsumerHook()), cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal(2, exit);
+            Assert.Contains("distinct from appsettings.json", console.Error.ToString(), StringComparison.Ordinal);
+            Assert.Equal(content, File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "appsettings.json")));
+        }
+        finally
+        {
+            File.Delete(solution);
+        }
+    }
+
     /// <summary>
     /// Vérifie qu'une sélection de projets encore non supportée échoue avant d'atteindre l'exécuteur.
     /// </summary>

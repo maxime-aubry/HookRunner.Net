@@ -23,8 +23,8 @@ public sealed class TimeoutTests
             started.SetResult();
             return await terminated.Task;
         });
-        Context context = new(executor, diagnostics, clock);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore(), clock);
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         Task<int> execution = context.ExecuteAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -61,8 +61,8 @@ public sealed class TimeoutTests
                 : new TimeoutException("Termination was not confirmed.");
             return Task.FromException<HookExecutionResult>(failure);
         });
-        Context context = new(executor, diagnostics, clock);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore(), clock);
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         int exit = await context.ExecuteAsync(TestContext.Current.CancellationToken);
 
@@ -93,8 +93,8 @@ public sealed class TimeoutTests
             external.Cancel();
             return Task.FromResult(new HookExecutionResult(HookExecutionStatus.Success, null));
         });
-        Context context = new(executor, diagnostics, clock);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore(), clock);
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         int exit = await context.ExecuteAsync(external.Token);
 
@@ -119,8 +119,8 @@ public sealed class TimeoutTests
             started = true;
             return Task.FromResult(new HookExecutionResult(HookExecutionStatus.Success, null));
         });
-        Context context = new(executor, diagnostics);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore());
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         int exit = await context.ExecuteAsync(external.Token);
 
@@ -144,8 +144,8 @@ public sealed class TimeoutTests
             token.ThrowIfCancellationRequested();
             return Task.FromResult(new HookExecutionResult(HookExecutionStatus.Success, null));
         });
-        Context context = new(executor, diagnostics, clock);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(int.MaxValue, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore(), clock);
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(int.MaxValue, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         int exit = await context.ExecuteAsync(TestContext.Current.CancellationToken);
 
@@ -169,8 +169,8 @@ public sealed class TimeoutTests
             clock.Advance(TimeSpan.FromSeconds(120), dispatchTimers);
             return Task.FromResult(new HookExecutionResult(HookExecutionStatus.ValidationFailure, "late verdict"));
         });
-        Context context = new(executor, diagnostics, clock);
-        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], "state.json"));
+        Context context = new(executor, diagnostics, new HookRunner.Infrastructure.FileHookStateStore(), clock);
+        context.SetStrategy(new SentinelHook(), fixture.Invocation, new HookOptions(120, fixture.Root, fixture.Root, [], Path.Combine(fixture.Root, "state.json")));
 
         int exit = await context.ExecuteAsync(TestContext.Current.CancellationToken);
 

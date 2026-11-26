@@ -36,6 +36,19 @@ internal sealed class StateFilePathResolver
             throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
         }
 
+        string canonical = CanonicalPath.Resolve(resolved);
+        string canonicalRoot = CanonicalPath.Resolve(solutionRoot);
+        string physicalRelative = Path.GetRelativePath(canonicalRoot, canonical);
+        if (physicalRelative == ".." || physicalRelative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
+        }
+
+        if (Path.GetRelativePath(canonical, CanonicalPath.Resolve(Path.Combine(AppContext.BaseDirectory, "appsettings.json"))) == ".")
+        {
+            throw new InvalidDataException("HookRunner:StateFilePath must be distinct from appsettings.json.");
+        }
+
         return resolved;
     }
 }

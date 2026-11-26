@@ -28,7 +28,10 @@ La lecture PDB est déléguée à
 [PdbSequencePointReader](../../tools/HookRunner.CI/Quality/Coverage/PdbSequencePointReader.cs),
 et la lecture et fusion des observations à
 [CoverletCoverageReader](../../tools/HookRunner.CI/Quality/Coverage/CoverletCoverageReader.cs).
-Les identifiants de lignes et de branches sont typés avant leur formatage en diagnostics.
+Les identifiants de lignes et de branches sont typés par
+[SourceLine](../../tools/HookRunner.CI/Quality/Coverage/SourceLine.cs) et
+[SourceBranch](../../tools/HookRunner.CI/Quality/Coverage/SourceBranch.cs)
+avant leur formatage en diagnostics.
 La racine déterministe `/_/` des PDB de CI est résolue dans la racine locale
 du dépôt avant comparaison avec les chemins JSON Coverlet. Les noms de fichiers
 ou suffixes seuls ne suffisent jamais à identifier un document.

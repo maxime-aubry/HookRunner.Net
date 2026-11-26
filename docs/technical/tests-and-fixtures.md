@@ -31,7 +31,11 @@ Dans `Support`, `ConfigurationFile` restaure la configuration initiale et
 `ConsoleCapture` restaure les flux précédents. Les doubles d'exécution
 mémorisent leurs requêtes sans lancer d'enfant. `AsyncConsumerService`
 permet d'observer la libération et ses erreurs. `ConsumerHost` borne l'attente
-du superviseur et capture stdout et stderr. `RunningInvocation` garantit
+du superviseur et capture stdout et stderr.
+[HostSimulation](../../tests/HookRunner.ExecutionTests/Support/HostSimulation.cs)
+porte le mode simulé et
+[HostResult](../../tests/HookRunner.ExecutionTests/Support/HostResult.cs)
+conserve le PID, le code de sortie et les flux capturés. `RunningInvocation` garantit
 l'annulation et l'attente finale des scénarios de processus, même après une
 assertion en échec ; `ConsumerProcessObservation` attend la publication du PID.
 

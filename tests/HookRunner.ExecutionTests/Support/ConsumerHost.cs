@@ -90,15 +90,3 @@ internal sealed class ConsumerHost(string directory, bool useAppHost = false)
         return new HostResult(process.Id, process.ExitCode, await output, await error);
     }
 }
-
-/// <summary>Paramètres de simulation transmis au consommateur par ses variables d'environnement.</summary>
-/// <param name="Mode">Nom du comportement à simuler dans le consommateur.</param>
-/// <param name="Result">Résultat brut du mode invalid-result ; null conserve la variable héritée.</param>
-internal sealed record HostSimulation(string Mode, string? Result);
-
-/// <summary>Observation complète d'un lancement du consommateur de test.</summary>
-/// <param name="ProcessId">Identifiant du processus consommateur terminé.</param>
-/// <param name="ExitCode">Code de sortie du consommateur.</param>
-/// <param name="Output">Contenu complet de sa sortie standard.</param>
-/// <param name="Error">Contenu complet de sa sortie d'erreur.</param>
-internal sealed record HostResult(int ProcessId, int ExitCode, string Output, string Error);

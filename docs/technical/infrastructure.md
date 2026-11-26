@@ -24,6 +24,12 @@ un fichier `.sln` ou `.slnx`. La racine devient le dossier par défaut ; le
 chemin d'état y est résolu et la liste de projets reste vide. Il ne crée
 pas d'état et ne déclenche aucune minuterie.
 
+La recherche ascendante appartient à
+[SolutionRootLocator](../../src/HookRunner.Infrastructure/Configuration/SolutionRootLocator.cs).
+[StateFilePathResolver](../../src/HookRunner.Infrastructure/Configuration/StateFilePathResolver.cs)
+regroupe la validation du chemin configuré et son confinement dans la solution.
+Le préparateur conserve l'ordre des validations et assemble les options finales.
+
 ## ChildProcessCommand
 
 [Source](../../src/HookRunner.Infrastructure/Execution/ChildProcessCommand.cs).
@@ -40,11 +46,21 @@ stdout et stderr sans les recopier dans les diagnostics du superviseur.
 Le dossier de travail provient des options préparées.
 
 Une attente interrompue entraîne l'arrêt de l'arbre de processus et une
-confirmation bornée à cinq secondes. Un code enfant non nul ou un résultat
+confirmation bornée à cinq secondes, avec un token technique distinct du
+token d'exécution. Il n'existe aucune grâce coopérative avant l'arrêt forcé.
+Le token global est revérifié immédiatement avant le lancement pour empêcher
+un démarrage après annulation pendant la préparation du transport.
+Un code enfant non nul ou un résultat
 absent provoque une erreur technique. La version, le statut et la présence
 d'un diagnostic pour les échecs sont vérifiés avant de rendre un résultat
-neutre à Application. Le dossier temporaire est supprimé dans `finally`.
+neutre à Application. Le dossier temporaire est supprimé à la libération du transport.
 Les erreurs de transport, d'annulation ou de nettoyage remontent à Context.
+
+L'exécuteur orchestre deux modules internes :
+[ChildHookTransport](../../src/HookRunner.Infrastructure/Execution/ChildHookTransport.cs)
+possède le dossier temporaire, la sérialisation et la validation du résultat ;
+[ChildProcessRunner](../../src/HookRunner.Infrastructure/Execution/ChildProcessRunner.cs)
+possède le lancement, le drainage des flux et l'arrêt garanti du processus.
 
 ## Protocole interne
 

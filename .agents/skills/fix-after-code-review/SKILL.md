@@ -10,9 +10,11 @@ Obtenir une implémentation vérifiée sur les axes `Standards` et `Spec`, en co
 ## 1. Cadrer la revue
 
 - Lire les instructions applicables du dépôt et les documents qu'elles désignent pour le périmètre concerné.
-- Relever la branche courante avec `git branch --show-current` et l'état initial avec `git status --short --untracked-files=all`. Si HEAD est détachée, le signaler. Préserver le travail préexistant et limiter les éditions aux corrections nécessaires.
-- Retrouver le point de référence Git et le ticket ou la spécification d'origine dans la demande et le contexte. Demander les éléments manquants nécessaires. Pour un ticket, suivre le workflow du tracker indiqué par le dépôt.
-- Justifier la référence par rapport au ticket ou à la spécification ; si elle ne peut pas être déterminée de manière fiable, demander une clarification avant la revue. Vérifier la référence avec `git rev-parse --verify <référence>^{commit}` et figer le SHA de base de comparaison avant la première revue. Si la revue utilise la merge-base, calculer ce SHA une fois avec `git merge-base <référence> HEAD`. Conserver cette base et les mêmes exigences pendant toute la boucle.
+- Relever la branche courante avec `git branch --show-current` et l'état initial avec `git status --short --untracked-files=all`. Si HEAD est détachée, arrêter le cadrage et demander sur quelle branche existante l'utilisateur souhaite poursuivre. Préserver le travail préexistant et limiter les éditions aux corrections nécessaires.
+- Reprendre la branche de comparaison explicitement précisée dans la demande ou le contexte. Sinon, lister les branches existantes avec `git for-each-ref --format='%(refname:short)' refs/heads refs/remotes`, puis demander : « Quelle branche utiliser comme référence pour comparer la branche courante : `develop`, `main` ou une autre branche existante ? » Adapter les choix aux branches présentes et attendre la réponse avant de poursuivre. Ne jamais déduire ce choix du ticket, de la branche amont ou de la branche par défaut, ni lui substituer un commit ou une plage de commits.
+- Vérifier l'existence de la branche choisie avec `git show-ref --verify <réf-branche>`, en utilisant sa référence complète `refs/heads/<nom>` ou `refs/remotes/<remote>/<nom>`. Si le nom est ambigu ou absent, demander de préciser une branche existante ; un tag ou un SHA seul ne convient pas. Résoudre ensuite son commit avec `git rev-parse --verify "<réf-branche>^{commit}"` et consigner ce SHA avec le choix explicite de l'utilisateur.
+- Calculer une seule fois `git merge-base --all HEAD <SHA-branche-comparaison>` avant la première revue. S'il existe une unique base commune, figer son SHA comme `<SHA-base>` pour toute la boucle, sans le recalculer aux passes suivantes, même si la branche de comparaison avance. En l'absence de base commune ou en présence de plusieurs bases, signaler le blocage et demander une clarification, sans en choisir une implicitement. Conserver les mêmes exigences pendant toute la boucle.
+- Retrouver le ticket ou la spécification d'origine dans la demande et le contexte. Pour les sources manquantes, suivre la recherche prévue par `code-review` ; pour un ticket, appliquer le workflow du tracker indiqué par le dépôt.
 - Charger le skill `code-review`. S'il est indisponible ou échoue, arrêter et décrire le blocage.
 
 **Inventaire Git.** Examiner séparément les quatre catégories, même si une comparaison est vide :
@@ -26,13 +28,21 @@ Obtenir une implémentation vérifiée sur les axes `Standards` et `Spec`, en co
 
 Constituer la liste des fichiers à examiner par l'union de ces inventaires, en dédoublonnant les chemins et en tenant compte des suppressions et renommages. Un échec de commande laisse l'inventaire incomplet. Une comparaison globale vide ne suffit pas : des changements committés et locaux peuvent se compenser. Consigner les exclusions éventuelles avec leur justification.
 
-**Périmètre de revue.** Fournir explicitement au skill `code-review` une consigne remplaçant son éventuel `git diff <référence>...HEAD` : examiner l'état courant par rapport à la base figée avec `git diff <SHA-base>`, les contenus non suivis et l'inventaire complet ci-dessus. Consulter aussi `git diff <SHA-base> HEAD` pour le contexte committé. Transmettre la même base, les commandes, la liste des commits et les fichiers aux deux axes de revue. Conserver leur méthode ; seule la comparaison Git est adaptée. Actualiser l'inventaire à chaque revue pour inclure les corrections et les nouveaux fichiers, sans réduire le périmètre aux seules dernières corrections.
+**Contrat d'invocation de `code-review`.** À chaque revue, transmettre la consigne suivante en remplaçant les paramètres par les valeurs et inventaires réels :
 
-Le cadrage est terminé quand la branche, la base justifiée, les exigences, les standards applicables et les quatre catégories de changements sont identifiés. Conclure à un périmètre vide uniquement après vérification réussie de ces quatre catégories ; dans ce cas, le signaler et terminer sans prétendre avoir réalisé une revue. Si une source nécessaire manque, signaler la couverture incomplète et demander cette source avant de conclure à la conformité.
+> Branche courante : `<branche-courante>`. Branche de comparaison choisie par l'utilisateur : `<réf-branche>`, résolue à `<SHA-branche-comparaison>`. Le `fixed point` est déjà déterminé : `<SHA-base>`, merge-base figé de ces branches. Utiliser ce SHA directement, sans redemander de référence ni proposer une sélection de commits récents.
+>
+> Surcharge de l'étape 1 : vérifier que ce SHA résout un commit, puis examiner l'état courant avec `git diff <SHA-base>`, le contexte committé avec `git diff <SHA-base> HEAD`, les diffs indexés et non indexés et les contenus non suivis de l'inventaire fourni. Le contrôle de périmètre vide porte sur les quatre catégories de cet inventaire, même si le diff committé ou global est vide. Ces consignes remplacent la comparaison `git diff <fixed-point>...HEAD` et son seul contrôle de diff non vide.
+>
+> Fournir aux deux sous-agents la même base, toutes ces commandes, la liste complète `git log --oneline <SHA-base>..HEAD` et l'union des fichiers inventoriés. Conserver les étapes de recherche des sources, les deux axes `Standards` et `Spec`, leurs méthodes et leur agrégation.
+
+Actualiser l'inventaire à chaque revue pour inclure les corrections et les nouveaux fichiers, sans réduire le périmètre aux seules dernières corrections. Si la branche courante a changé, arrêter et signaler le changement de périmètre.
+
+Le cadrage est terminé quand la branche courante, la branche de comparaison choisie explicitement et vérifiée, son merge-base figé, les exigences, les standards applicables et les quatre catégories de changements sont identifiés. Conclure à un périmètre vide uniquement après vérification réussie de ces quatre catégories ; dans ce cas, le signaler et terminer sans prétendre avoir réalisé une revue. Si une source nécessaire manque, signaler la couverture incomplète et demander cette source avant de conclure à la conformité.
 
 ## 2. Obtenir et qualifier le rapport
 
-Invoquer explicitement `mattpocock-skills:code-review` avec la base figée, le périmètre courant, la spécification et les standards du dépôt. Récupérer et examiner les rapports complets `Standards` et `Spec`. Un rapport déjà fourni peut servir d'entrée si son périmètre et ses sources correspondent à l'état courant ; il ne remplace pas cette invocation. Une analyse improvisée ne remplace pas le skill : s'il échoue ou si un rapport manque, signaler la vérification incomplète.
+Invoquer explicitement `mattpocock-skills:code-review` selon le contrat ci-dessus, avec le périmètre courant, la spécification et les standards du dépôt. Récupérer et examiner les rapports complets `Standards` et `Spec`. Un rapport déjà fourni peut servir d'entrée si son périmètre et ses sources correspondent à l'état courant ; il ne remplace pas cette invocation. Une analyse improvisée ne remplace pas le skill : s'il échoue ou si un rapport manque, signaler la vérification incomplète.
 
 Pour chaque constat, conserver son axe, les fichiers ou comportements concernés, sa source (règle, exigence ou heuristique) et les preuves citées. Vérifier sa pertinence par rapport au ticket et aux standards applicables, puis lui attribuer un statut justifié :
 
@@ -76,7 +86,7 @@ Distinguer une réussite, une limite de passes atteinte et une vérification blo
 
 Fournir :
 
-- la branche courante, la référence retenue, le SHA de base figé et la justification du choix ;
+- la branche courante, la référence complète de la branche de comparaison, son SHA résolu, le SHA de merge-base figé et le choix explicite de l'utilisateur ;
 - les commandes d'inventaire et de comparaison réellement exécutées, ainsi que les exclusions justifiées ;
 - le nombre total de fichiers distincts examinés et le décompte par catégorie Git, notamment les fichiers indexés et non suivis ; préciser que les catégories peuvent se recouper ;
 - les écarts confirmés initiaux par axe, les corrections et fichiers concernés, ainsi que les écarts restants ;

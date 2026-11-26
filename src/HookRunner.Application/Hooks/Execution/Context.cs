@@ -5,9 +5,12 @@ namespace HookRunner.Application;
 /// </summary>
 /// <param name="executor">Service d'exécution isolée utilisé pour lancer le hook.</param>
 /// <param name="diagnostics">Flux recevant les traces et diagnostics d'exécution.</param>
-public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnostics)
+/// <param name="timeProvider">Horloge de supervision ; null utilise l'horloge système.</param>
+public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnostics, TimeProvider? timeProvider = null)
 {
     private IsolatedHookRequest? request;
+    private readonly InvocationSupervisor supervisor = new(executor, timeProvider ?? TimeProvider.System);
+    private readonly ExecutionReporter reporter = new(diagnostics);
 
     /// <summary>
     /// Prépare l'exécution isolée de la stratégie sélectionnée en remplaçant la requête du contexte.
@@ -29,33 +32,34 @@ public sealed class Context(IIsolatedHookExecutor executor, TextWriter diagnosti
     /// Token d'annulation transmis aux opérations qui le prennent en charge.
     /// </param>
     /// <returns>
-    /// Une tâche donnant 0 en cas de succès, ou 2 pour un résultat d'échec, une exception ou un contexte non
-    /// préparé.
+    /// Une tâche donnant 0 en cas de succès ou de timeout avec arrêt confirmé, ou 2 pour un échec métier,
+    /// technique, une annulation extérieure ou un contexte non préparé.
     /// </returns>
     /// <remarks>
-    /// Les exceptions, y compris l'annulation extérieure, sont traduites en diagnostic technique. Cette méthode
-    /// n'applique pas encore le timeout des options ni les règles de compteur. Le contexte conserve sa requête et
-    /// ne doit pas être partagé entre exécutions concurrentes.
+    /// Le budget unique commence avant l'appel de l'exécuteur, qui doit forcer l'arrêt sur annulation et en
+    /// confirmer la terminaison dans un délai technique fini. Un résultat tardif est ignoré. Les règles de compteur
+    /// ne sont pas encore appliquées. Le contexte ne doit pas être partagé entre exécutions concurrentes.
     /// </remarks>
     public async Task<int> ExecuteAsync(CancellationToken cancellationToken)
     {
         try
         {
-            IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
-            HookExecutionResult result = await executor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
-            if (result.Status == HookExecutionStatus.Success)
-            {
-                diagnostics.WriteLine($"Hook '{execution.HookName}' succeeded.");
-                return 0;
-            }
-
-            diagnostics.WriteLine(result.Diagnostic);
-            return 2;
+            return await ExecutePreparedAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            diagnostics.WriteLine($"Hook execution failed: {exception.Message}");
-            return 2;
+            return reporter.ReportFailure(exception);
         }
+    }
+
+    /// <summary>Supervise la requête sélectionnée puis écrit le diagnostic correspondant au résultat.</summary>
+    /// <param name="cancellationToken">Annulation extérieure, distincte de l'échéance du hook.</param>
+    /// <returns>Une tâche donnant 0 pour un succès ou un timeout confirmé, sinon 2.</returns>
+    /// <exception cref="InvalidOperationException">Aucune stratégie n'a été préparée dans ce contexte.</exception>
+    private async Task<int> ExecutePreparedAsync(CancellationToken cancellationToken)
+    {
+        IsolatedHookRequest execution = request ?? throw new InvalidOperationException("No hook strategy was selected.");
+        HookExecutionResult? result = await supervisor.ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
+        return reporter.Report(execution, result);
     }
 }

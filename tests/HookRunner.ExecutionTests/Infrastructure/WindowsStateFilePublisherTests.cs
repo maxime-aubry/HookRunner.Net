@@ -67,35 +67,57 @@ public sealed class WindowsStateFilePublisherTests
 
     /// <summary>Une erreur native d'ouverture ou de renommage reste observable avec son code Windows.</summary>
     /// <param name="openFails">True simule une ouverture refusée ; false refuse le renommage.</param>
+    /// <param name="expectedError">Code Windows attendu pour l'opération refusée.</param>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void NativeFailuresPreserveTheirErrorAndReleaseTheHandle(bool openFails)
+    [InlineData(true, 5)]
+    [InlineData(false, 32)]
+    public void NativeFailuresPreserveTheirErrorAndReleaseTheHandle(bool openFails, int expectedError)
     {
-        using SafeFileHandle handle = new(new IntPtr(42), ownsHandle: false);
+        IntPtr nativeHandle = new(42);
+        if (openFails)
+        {
+            nativeHandle = new IntPtr(-1);
+        }
+
+        using SafeFileHandle handle = new(nativeHandle, ownsHandle: false);
+        bool renameAttempted = false;
         WindowsStateFilePublisher publisher = new((path, access, share, security, creation, flags, template) =>
         {
             if (openFails)
             {
-                SafeFileHandle invalid = new(new IntPtr(-1), ownsHandle: false);
                 Marshal.SetLastPInvokeError(5);
-                return invalid;
             }
 
             return handle;
         }, (file, informationClass, information, size) =>
         {
-            Marshal.SetLastPInvokeError(5);
+            renameAttempted = true;
+            Marshal.SetLastPInvokeError(32);
             return false;
         });
 
         IOException failure = Assert.Throws<IOException>(() => publisher.Publish(@"C:\solution\prepared.tmp", @"C:\solution\state.json"));
 
-        Assert.Equal(5, Assert.IsType<Win32Exception>(failure.InnerException).NativeErrorCode);
-        if (!openFails)
-        {
-            Assert.True(handle.IsClosed);
-        }
+        Assert.Equal(expectedError, Assert.IsType<Win32Exception>(failure.InnerException).NativeErrorCode);
+        Assert.Equal(!openFails, renameAttempted);
+        Assert.True(handle.IsClosed);
+    }
+
+    /// <summary>Une exception du renommage est propagée après libération du handle du temporaire.</summary>
+    [Fact]
+    public void UnexpectedRenameFailureReleasesTheHandle()
+    {
+        using SafeFileHandle handle = new(new IntPtr(42), ownsHandle: false);
+        InvalidOperationException expected = new("Unexpected rename failure.");
+        WindowsStateFilePublisher publisher = new(
+            (path, access, share, security, creation, flags, template) => handle,
+            (file, informationClass, information, size) => throw expected);
+
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            publisher.Publish(@"C:\solution\prepared.tmp", @"C:\solution\state.json"));
+
+        Assert.Same(expected, failure);
+        Assert.True(handle.IsClosed);
     }
 
     /// <summary>Le choix d'adaptateur n'invoque pas Windows et le renommage portable remplace un document fermé.</summary>

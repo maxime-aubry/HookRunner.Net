@@ -10,8 +10,10 @@ namespace HookRunner.Infrastructure;
 internal sealed partial class WindowsStateFilePublisher
 {
     private const uint DeleteAccess = 0x00010000;
+    private const uint OpenExisting = 3;
     private const int FileRenameInfoEx = 22;
-    private const int ReplaceExistingWithPosixSemantics = 3;
+    private const int ReplaceIfExists = 1;
+    private const int PosixSemantics = 2;
     private readonly OpenFile open;
     private readonly RenameFile rename;
 
@@ -31,24 +33,56 @@ internal sealed partial class WindowsStateFilePublisher
     /// <remarks>Requiert FileRenameInfoEx et FILE_RENAME_POSIX_SEMANTICS ; aucun repli non atomique n'est effectué.</remarks>
     public void Publish(string temporary, string path)
     {
-        using SafeFileHandle file = open(ToExtendedPath(temporary), DeleteAccess, FileShare.ReadWrite | FileShare.Delete,
-            IntPtr.Zero, 3, 0, IntPtr.Zero);
+        using SafeFileHandle file = OpenTemporaryForRename(temporary);
+        byte[] information = BuildRenameInformation(path);
+        RenameOrThrow(file, information, path);
+    }
+
+    /// <summary>Ouvre le temporaire et transfère son handle valide à l'appelant.</summary>
+    /// <param name="temporary">Chemin absolu normalisé du document à publier.</param>
+    /// <returns>Handle possédé par l'appelant, à libérer après la tentative de publication.</returns>
+    /// <exception cref="IOException">L'ouverture échoue ; le handle invalide est libéré et l'erreur Windows est conservée.</exception>
+    private SafeFileHandle OpenTemporaryForRename(string temporary)
+    {
+        SafeFileHandle file = open(ToExtendedPath(temporary), DeleteAccess, FileShare.ReadWrite | FileShare.Delete,
+            IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
         if (file.IsInvalid)
         {
-            throw new IOException($"Cannot open state publication file '{temporary}'.", new Win32Exception(Marshal.GetLastPInvokeError()));
+            int error = Marshal.GetLastPInvokeError();
+            file.Dispose();
+            throw new IOException($"Cannot open state publication file '{temporary}'.", new Win32Exception(error));
         }
 
+        return file;
+    }
+
+    /// <summary>Encode la destination et les flags POSIX dans le tampon natif FILE_RENAME_INFO.</summary>
+    /// <param name="path">Chemin absolu normalisé de la destination.</param>
+    /// <returns>Tampon aligné pour le processus courant, contenant le nom étendu en UTF-16.</returns>
+    private static byte[] BuildRenameInformation(string path)
+    {
         byte[] name = Encoding.Unicode.GetBytes(ToExtendedPath(path));
         // FILE_RENAME_INFO aligne RootDirectory sur la taille d'un pointeur ; FileName suit sa longueur DWORD.
         int lengthOffset = IntPtr.Size * 2;
         int nameOffset = lengthOffset + sizeof(int);
         byte[] information = new byte[nameOffset + name.Length + sizeof(char)];
-        BinaryPrimitives.WriteInt32LittleEndian(information, ReplaceExistingWithPosixSemantics);
+        BinaryPrimitives.WriteInt32LittleEndian(information, ReplaceIfExists | PosixSemantics);
         BinaryPrimitives.WriteInt32LittleEndian(information.AsSpan(lengthOffset), name.Length);
         name.CopyTo(information, nameOffset);
+        return information;
+    }
+
+    /// <summary>Soumet le renommage atomique et traduit uniquement un échec natif signalé.</summary>
+    /// <param name="file">Handle du temporaire, dont l'appelant conserve la propriété.</param>
+    /// <param name="information">Tampon FILE_RENAME_INFO contenant la destination et les flags.</param>
+    /// <param name="path">Chemin de destination utilisé pour contextualiser une erreur.</param>
+    /// <exception cref="IOException">Le renommage échoue ; l'erreur Windows est conservée sans repli.</exception>
+    private void RenameOrThrow(SafeFileHandle file, byte[] information, string path)
+    {
         if (!rename(file, FileRenameInfoEx, information, information.Length))
         {
-            throw new IOException($"Cannot atomically publish state file '{path}'.", new Win32Exception(Marshal.GetLastPInvokeError()));
+            int error = Marshal.GetLastPInvokeError();
+            throw new IOException($"Cannot atomically publish state file '{path}'.", new Win32Exception(error));
         }
     }
 

@@ -124,7 +124,7 @@ public sealed class FileHookStateStore : IHookStateStore
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporary, path, overwrite: true);
+            StateFilePublisher.Publish(temporary, path);
         }
         finally
         {

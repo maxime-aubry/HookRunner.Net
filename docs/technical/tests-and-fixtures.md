@@ -53,6 +53,39 @@ sérialisation et timeout pendant l'attente via `RunHookUseCase`.
 couvre les règles pures et les exceptions métier.
 [`HostCounterTests`](../../tests/HookRunner.ExecutionTests/Integration/HostCounterTests.cs)
 vérifie persistance entre lancements, surcharges et concurrence interprocessus.
+[`HostConcurrencyTests`](../../tests/HookRunner.ExecutionTests/Integration/HostConcurrencyTests.cs)
+synchronise explicitement les hooks par canaux nommés : une identité reste
+occupée tandis qu'une autre termine, une invocation en attente expire sans
+enfant ni changement de compteur, et plusieurs identités publient leurs
+compteurs dans le même fichier sans perdre les entrées antérieures. Les tests
+vérifient aussi la libération après succès, demande métier et erreur technique.
+Un lien physique conserve l'ancien document publié avant l'autorisation des
+écritures : son contenu reste inchangé après publication, ce qui détecte une
+réécriture du fichier en place. `FileSnapshot` crée ce lien avec `fsutil`
+sous Windows et `ln` sous Unix, sans garder ouvert le fichier remplacé.
+[`StateFileObservation`](../../tests/HookRunner.ExecutionTests/Support/StateFileObservation.cs)
+rouvre directement le chemin publié sans prendre le verrou de document. Une
+première lecture complète précède la libération des hooks ; les lectures
+continuent pendant leurs publications et une dernière suit leur terminaison.
+Chaque instantané doit rester un JSON complet avec l'entrée préexistante et
+des compteurs cohérents. L'ouverture partage aussi le droit de suppression
+pour permettre le remplacement sous Windows ; aucune erreur d'accès ou de
+lecture n'est masquée par une nouvelle tentative.
+[`StatePublicationTests`](../../tests/HookRunner.ExecutionTests/Infrastructure/StatePublicationTests.cs)
+conserve explicitement un lecteur ouvert pendant une sauvegarde réelle :
+l'ancien handle doit lire le compteur précédent et le chemin publié le suivant.
+Ce scénario reproduit sans dépendre de l'ordonnancement le refus de `File.Move`
+sous Windows. Il couvre aussi un dossier de plus de 300 caractères : la création
+de l'état absent et les sauvegardes doivent fonctionner sans modifier la
+configuration Windows des chemins longs. Les contrats et erreurs de l'appel natif,
+les chemins locaux, UNC et déjà préfixés, son tampon Unicode et
+la propriété du handle sont vérifiés par
+[`WindowsStateFilePublisherTests`](../../tests/HookRunner.ExecutionTests/Infrastructure/WindowsStateFilePublisherTests.cs)
+avec des appels natifs simulés, exécutables sur les trois systèmes.
+Une frontière d'exécution contrôlée avec l'horloge manuelle suspend la
+confirmation d'arrêt pendant qu'un autre processus tente la même identité ;
+le verrou reste détenu jusqu'à confirmation, même en cas d'échec technique,
+puis les invocations suivantes retrouvent leur compteur inchangé.
 Les demandes à message vide ou composé d'espaces passent par le véritable enfant
 et consomment le plafond, avec trois retours `2` puis un retour `0`.
 [`DirectoryLink`](../../tests/HookRunner.ExecutionTests/Support/DirectoryLink.cs)
@@ -68,6 +101,12 @@ sérialise les suites de processus instrumentés pour éviter les collisions à 
 publication des rapports Coverlet. Le scénario explicitement concurrent utilise
 les assemblies de la fixture non instrumentées ; les autres tests exécutent le
 même code avec couverture. Aucun code de production n'est exclu de la mesure.
+`HookGate` échange un signal d'entrée et une autorisation de terminer avec
+l'enfant. Le hook publie aussi un témoin d'entrée propre à chaque invocation,
+avant toute attente sur le canal ; l'absence de ce fichier après terminaison
+prouve qu'un hook en attente de verrou n'a pas commencé. `RunningConsumer` annule et attend les superviseurs concurrents
+avant la suppression de la solution temporaire, y compris après une assertion
+en échec. Ces scénarios utilisent le stockage réel et aucun modèle.
 
 ## Tests des politiques
 

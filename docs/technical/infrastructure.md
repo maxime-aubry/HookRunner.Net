@@ -64,8 +64,12 @@ publié par [StateFilePublisher](../../src/HookRunner.Infrastructure/Storage/Sta
 Sous Unix, la publication utilise `File.Move` avec remplacement. Sous Windows,
 [WindowsStateFilePublisher](../../src/HookRunner.Infrastructure/Storage/WindowsStateFilePublisher.cs)
 ouvre le temporaire avec le droit `DELETE` et soumet `FileRenameInfoEx` avec
-`FILE_RENAME_REPLACE_IF_EXISTS | FILE_RENAME_POSIX_SEMANTICS`. Les lecteurs
-existants conservent l'ancien document ; les nouvelles ouvertures obtiennent
+`FILE_RENAME_REPLACE_IF_EXISTS | FILE_RENAME_POSIX_SEMANTICS`.
+Les chemins absolus normalisés du temporaire et de la destination reçoivent
+un préfixe étendu (`\\?\` pour un chemin local, `\\?\UNC\` pour un partage UNC) ;
+les chemins de périphérique déjà préfixés sont conservés. Cette conversion
+permet les chemins longs même lorsque `LongPathsEnabled` est désactivé.
+Les lecteurs existants conservent l'ancien document ; les nouvelles ouvertures obtiennent
 le nouveau sans suppression préalable du chemin. `File.Move` refuse ici une
 destination ouverte sous Windows et `File.Replace` peut exposer un chemin
 momentanément absent. Le renommage étendu exige un système de fichiers qui le

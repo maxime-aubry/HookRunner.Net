@@ -25,20 +25,20 @@ internal sealed partial class WindowsStateFilePublisher
     }
 
     /// <summary>Remplace le nom de destination tout en conservant les handles de l'ancien fichier.</summary>
-    /// <param name="temporary">Document fermé et synchronisé, situé sur le volume de destination.</param>
+    /// <param name="temporary">Chemin absolu normalisé du document fermé et synchronisé, sur le volume de destination.</param>
     /// <param name="path">Chemin absolu à publier sous le verrou de document.</param>
     /// <exception cref="IOException">L'ouverture native ou le renommage échoue ; l'erreur Windows est conservée.</exception>
     /// <remarks>Requiert FileRenameInfoEx et FILE_RENAME_POSIX_SEMANTICS ; aucun repli non atomique n'est effectué.</remarks>
     public void Publish(string temporary, string path)
     {
-        using SafeFileHandle file = open(temporary, DeleteAccess, FileShare.ReadWrite | FileShare.Delete,
+        using SafeFileHandle file = open(ToExtendedPath(temporary), DeleteAccess, FileShare.ReadWrite | FileShare.Delete,
             IntPtr.Zero, 3, 0, IntPtr.Zero);
         if (file.IsInvalid)
         {
             throw new IOException($"Cannot open state publication file '{temporary}'.", new Win32Exception(Marshal.GetLastPInvokeError()));
         }
 
-        byte[] name = Encoding.Unicode.GetBytes(path);
+        byte[] name = Encoding.Unicode.GetBytes(ToExtendedPath(path));
         // FILE_RENAME_INFO aligne RootDirectory sur la taille d'un pointeur ; FileName suit sa longueur DWORD.
         int lengthOffset = IntPtr.Size * 2;
         int nameOffset = lengthOffset + sizeof(int);
@@ -50,6 +50,26 @@ internal sealed partial class WindowsStateFilePublisher
         {
             throw new IOException($"Cannot atomically publish state file '{path}'.", new Win32Exception(Marshal.GetLastPInvokeError()));
         }
+    }
+
+    /// <summary>Préserve les chemins absolus normalisés longs sans dépendre de la configuration Windows.</summary>
+    /// <param name="path">Chemin Windows absolu déjà normalisé par le stockage.</param>
+    /// <returns>Chemin de périphérique existant, ou chemin local ou UNC muni de son préfixe étendu.</returns>
+    private static string ToExtendedPath(string path)
+    {
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal)
+            || path.StartsWith(@"\??\", StringComparison.Ordinal)
+            || path.StartsWith(@"\\.\", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return @"\\?\UNC\" + path[2..];
+        }
+
+        return @"\\?\" + path;
     }
 
     /// <summary>Ouvre le temporaire avec le droit DELETE nécessaire au renommage.</summary>

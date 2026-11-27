@@ -11,15 +11,25 @@ namespace HookRunner.ExecutionTests;
 public sealed class WindowsStateFilePublisherTests
 {
     /// <summary>Le renommage transmet le chemin Unicode et les droits POSIX, puis libère son handle.</summary>
-    [Fact]
-    public void PublicationSuppliesPosixRenameAndOwnsItsHandle()
+    /// <param name="directory">Dossier absolu Windows du temporaire et de la destination.</param>
+    /// <param name="nativeDirectory">Dossier attendu par les API natives, avec son préfixe étendu.</param>
+    [Theory]
+    [InlineData(@"C:\solution-é\Hooks", @"\\?\C:\solution-é\Hooks")]
+    [InlineData(@"\\server\share\Hooks", @"\\?\UNC\server\share\Hooks")]
+    [InlineData(@"\\?\C:\solution-é\Hooks", @"\\?\C:\solution-é\Hooks")]
+    [InlineData(@"\\?\UNC\server\share\Hooks", @"\\?\UNC\server\share\Hooks")]
+    [InlineData(@"\??\C:\solution-é\Hooks", @"\??\C:\solution-é\Hooks")]
+    [InlineData(@"\\.\C:\solution-é\Hooks", @"\\.\C:\solution-é\Hooks")]
+    public void PublicationSuppliesPosixRenameAndOwnsItsHandle(string directory, string nativeDirectory)
     {
-        string destination = @"C:\solution-é\Hooks\state.json";
+        string temporary = directory + @"\prepared.tmp";
+        string destination = directory + @"\state.json";
+        string nativeDestination = nativeDirectory + @"\state.json";
         using SafeFileHandle handle = new(new IntPtr(42), ownsHandle: false);
         bool renamed = false;
         WindowsStateFilePublisher publisher = new((path, access, share, security, creation, flags, template) =>
         {
-            Assert.Equal("prepared.tmp", path);
+            Assert.Equal(nativeDirectory + @"\prepared.tmp", path);
             Assert.Equal(0x00010000U, access);
             Assert.Equal(FileShare.ReadWrite | FileShare.Delete, share);
             Assert.Equal(IntPtr.Zero, security);
@@ -41,15 +51,15 @@ public sealed class WindowsStateFilePublisherTests
 
             Assert.All(information[4..(nameOffset - 4)], value => Assert.Equal(0, value));
             int nameLength = BinaryPrimitives.ReadInt32LittleEndian(information.AsSpan(nameOffset - 4));
-            Assert.Equal(destination.Length * 2, nameLength);
-            Assert.Equal(destination, Encoding.Unicode.GetString(information, nameOffset, nameLength));
+            Assert.Equal(nativeDestination.Length * 2, nameLength);
+            Assert.Equal(nativeDestination, Encoding.Unicode.GetString(information, nameOffset, nameLength));
             Assert.Equal(nameOffset + nameLength + 2, size);
             Assert.Equal(new byte[] { 0, 0 }, information[^2..]);
             renamed = true;
             return true;
         });
 
-        publisher.Publish("prepared.tmp", destination);
+        publisher.Publish(temporary, destination);
 
         Assert.True(renamed);
         Assert.True(handle.IsClosed);
@@ -79,7 +89,7 @@ public sealed class WindowsStateFilePublisherTests
             return false;
         });
 
-        IOException failure = Assert.Throws<IOException>(() => publisher.Publish("prepared.tmp", "state.json"));
+        IOException failure = Assert.Throws<IOException>(() => publisher.Publish(@"C:\solution\prepared.tmp", @"C:\solution\state.json"));
 
         Assert.Equal(5, Assert.IsType<Win32Exception>(failure.InnerException).NativeErrorCode);
         if (!openFails)

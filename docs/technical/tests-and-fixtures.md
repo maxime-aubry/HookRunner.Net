@@ -75,7 +75,10 @@ lecture n'est masquée par une nouvelle tentative.
 conserve explicitement un lecteur ouvert pendant une sauvegarde réelle :
 l'ancien handle doit lire le compteur précédent et le chemin publié le suivant.
 Ce scénario reproduit sans dépendre de l'ordonnancement le refus de `File.Move`
-sous Windows. Les contrats et erreurs de l'appel natif, son tampon Unicode et
+sous Windows. Il couvre aussi un dossier de plus de 300 caractères : la création
+de l'état absent et les sauvegardes doivent fonctionner sans modifier la
+configuration Windows des chemins longs. Les contrats et erreurs de l'appel natif,
+les chemins locaux, UNC et déjà préfixés, son tampon Unicode et
 la propriété du handle sont vérifiés par
 [`WindowsStateFilePublisherTests`](../../tests/HookRunner.ExecutionTests/Infrastructure/WindowsStateFilePublisherTests.cs)
 avec des appels natifs simulés, exécutables sur les trois systèmes.

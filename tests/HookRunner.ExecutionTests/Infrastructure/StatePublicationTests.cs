@@ -9,12 +9,21 @@ namespace HookRunner.ExecutionTests;
 public sealed class StatePublicationTests
 {
     /// <summary>Un lecteur garde son instantané complet tandis que le chemin publié reçoit le nouvel état.</summary>
+    /// <param name="minimumDirectoryLength">Longueur minimale du dossier, pour couvrir aussi les chemins dépassant MAX_PATH.</param>
     /// <returns>Une tâche vérifiant les deux documents sans verrou de lecture applicatif.</returns>
-    [Fact]
-    public async Task OpenReaderKeepsPreviousDocumentWhileNextCounterIsPublished()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(300)]
+    public async Task OpenReaderKeepsPreviousDocumentWhileNextCounterIsPublished(int minimumDirectoryLength)
     {
         using SolutionFixture fixture = new();
-        string path = Path.Combine(fixture.Root, "state.json");
+        string directory = fixture.Root;
+        while (directory.Length < minimumDirectoryLength)
+        {
+            directory = Path.Combine(directory, "long-directory-segment");
+        }
+
+        string path = Path.Combine(directory, "state.json");
         FileHookStateStore store = new();
         HookIdentity identity = new(fixture.Root, "codex", "session", "inspect");
         await using IHookStateSession session = await store.OpenAsync(path, identity, TestContext.Current.CancellationToken);

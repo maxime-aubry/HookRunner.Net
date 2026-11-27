@@ -34,7 +34,11 @@ Le préparateur conserve l'ordre des validations et assemble les options finales
 [TargetProjectResolver](../../src/HookRunner.Infrastructure/Configuration/TargetProjectResolver.cs)
 lit les solutions `.sln` avec `Microsoft.Build.Construction.SolutionFile` et les
 solutions `.slnx` avec `Microsoft.VisualStudio.SolutionPersistence`, sans explorer
-les autres niveaux ni évaluer les fichiers projets. Le lecteur classique accepte
+les autres niveaux ni évaluer les fichiers projets.
+Les erreurs d'accès, de lecture et d'analyse des solutions remontent sans interception
+pendant la préparation ; elles sont signalées par la frontière CLI avant toute exécution
+du hook et tout accès aux compteurs.
+Le lecteur classique accepte
 les noms de fichiers identiques dans un même dossier logique, afin que seuls les
 noms demandés déclenchent le contrôle d'ambiguïté. Les dossiers de solution sont
 exclus des références de projets. Les noms sont

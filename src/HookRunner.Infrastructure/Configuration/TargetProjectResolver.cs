@@ -16,6 +16,11 @@ internal static class TargetProjectResolver
     /// <exception cref="InvalidDataException">
     /// Un nom est invalide, inconnu ou ambigu, ou un projet est absent ou hors racine.
     /// </exception>
+    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">Une solution .sln est illisible ou mal formée.</exception>
+    /// <exception cref="SolutionException">Une solution .slnx ne respecte pas le format attendu.</exception>
+    /// <exception cref="IOException">L'énumération du dossier ou la lecture d'une solution échoue.</exception>
+    /// <exception cref="UnauthorizedAccessException">L'accès au dossier ou à une solution est refusé.</exception>
+    /// <remarks>Les erreurs des lecteurs de solutions remontent sans interception, avant toute exécution du hook.</remarks>
     public static IReadOnlyList<TargetProject> Resolve(string root, IReadOnlyList<string> requestedNames)
     {
         if (requestedNames.Count == 0)
@@ -84,6 +89,11 @@ internal static class TargetProjectResolver
     /// <summary>Lit les formats de solution avec le parseur Microsoft sans charger ni évaluer les projets.</summary>
     /// <param name="root">Dossier des solutions ; aucun parent ni sous-dossier n'est exploré.</param>
     /// <returns>Les chemins absolus normalisés des projets C# référencés.</returns>
+    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">Une solution .sln est illisible ou mal formée.</exception>
+    /// <exception cref="SolutionException">Une solution .slnx ne respecte pas le format attendu.</exception>
+    /// <exception cref="IOException">L'énumération du dossier ou la lecture d'une solution échoue.</exception>
+    /// <exception cref="UnauthorizedAccessException">L'accès au dossier ou à une solution est refusé.</exception>
+    /// <remarks>La lecture est différée à l'énumération ; ses erreurs remontent sans interception.</remarks>
     private static IEnumerable<string> ReadProjectPaths(string root)
     {
         foreach (FileInfo solution in new DirectoryInfo(root).EnumerateFiles().Where(SolutionRootLocator.IsSolution).OrderBy(file => file.Name, StringComparer.Ordinal))
@@ -102,6 +112,11 @@ internal static class TargetProjectResolver
     /// <summary>Lit les références sans imposer aux solutions classiques l'unicité des noms de fichiers projets.</summary>
     /// <param name="solution">Solution du dossier retenu.</param>
     /// <returns>Chemins des projets tels qu'ils sont référencés dans la solution.</returns>
+    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">La solution .sln est illisible ou mal formée.</exception>
+    /// <exception cref="SolutionException">La solution .slnx ne respecte pas le format attendu.</exception>
+    /// <exception cref="IOException">La lecture du fichier de solution échoue.</exception>
+    /// <exception cref="UnauthorizedAccessException">L'accès au fichier de solution est refusé.</exception>
+    /// <remarks>Les erreurs de lecture et d'analyse du parseur choisi remontent sans interception.</remarks>
     private static IEnumerable<string> ReadSolutionProjectPaths(FileInfo solution)
     {
         if (solution.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase))

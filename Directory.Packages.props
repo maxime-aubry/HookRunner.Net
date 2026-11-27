@@ -3,6 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Microsoft.Build" Version="18.12.2" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
     <PackageVersion Include="Scrutor" Version="7.0.0" />

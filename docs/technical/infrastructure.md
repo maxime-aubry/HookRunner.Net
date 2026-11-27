@@ -32,8 +32,12 @@ vers un autre lecteur Windows est refusée avant l'ouverture de l'état.
 Le préparateur conserve l'ordre des validations et assemble les options finales.
 
 [TargetProjectResolver](../../src/HookRunner.Infrastructure/Configuration/TargetProjectResolver.cs)
-lit toutes les solutions du dossier retenu avec `Microsoft.VisualStudio.SolutionPersistence`,
-sans explorer les autres niveaux ni évaluer les fichiers projets. Les noms sont
+lit les solutions `.sln` avec `Microsoft.Build.Construction.SolutionFile` et les
+solutions `.slnx` avec `Microsoft.VisualStudio.SolutionPersistence`, sans explorer
+les autres niveaux ni évaluer les fichiers projets. Le lecteur classique accepte
+les noms de fichiers identiques dans un même dossier logique, afin que seuls les
+noms demandés déclenchent le contrôle d'ambiguïté. Les dossiers de solution sont
+exclus des références de projets. Les noms sont
 ceux des fichiers `.csproj` sans extension : espaces périphériques retirés,
 comparaison insensible à la casse, demandes et références au même fichier physique
 dédupliquées. L'ordre des demandes est conservé.

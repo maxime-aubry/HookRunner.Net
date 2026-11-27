@@ -139,8 +139,11 @@ public sealed class ProjectSelectionTests
     }
 
     /// <summary>Deux fichiers distincts restent ambigus même lorsque leurs noms diffèrent seulement par la casse.</summary>
-    [Fact]
-    public void RejectsOnlyARequestedAmbiguousName()
+    /// <param name="classicSolution">True utilise une solution .sln sans dossiers logiques séparant les projets.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RejectsOnlyARequestedAmbiguousName(bool classicSolution)
     {
         using SolutionFixture fixture = new();
         CreateProject(fixture.Root, "one/Api.csproj");
@@ -153,6 +156,22 @@ public sealed class ProjectSelectionTests
               <Project Path="Safe.csproj" />
             </Solution>
             """);
+        if (classicSolution)
+        {
+            File.WriteAllText(Path.Combine(fixture.Root, "Example.slnx"), "<Solution />");
+            File.WriteAllText(Path.Combine(fixture.Root, "Other.sln"), """
+                Microsoft Visual Studio Solution File, Format Version 12.00
+                Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "First", "one\Api.csproj", "{C2BD5C34-1DCA-4F38-BAE0-0F5773075519}"
+                EndProject
+                Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Second", "two\API.csproj", "{D3BD5C34-1DCA-4F38-BAE0-0F5773075519}"
+                EndProject
+                Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Safe", "Safe.csproj", "{E3BD5C34-1DCA-4F38-BAE0-0F5773075519}"
+                EndProject
+                Global
+                EndGlobal
+                """);
+        }
+
         HookOptionsPreparer preparer = new(120, "Hooks/state.json");
 
         HookOptions valid = preparer.Prepare(new RunHookArgs("hook", null, ["Safe"]), fixture.Invocation);

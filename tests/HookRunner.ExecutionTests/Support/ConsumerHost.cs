@@ -16,11 +16,22 @@ internal sealed class ConsumerHost(string directory, bool useAppHost = false, bo
     /// <param name="json">Événement natif envoyé sur stdin avant sa fermeture.</param>
     /// <param name="simulation">Mode de simulation à transmettre par l'environnement ; null conserve le mode hérité.</param>
     /// <returns>Une tâche donnant le PID, le code de sortie et les deux flux de sortie capturés.</returns>
-    public async Task<HostResult> RunAsync(string[] arguments, string json, HostSimulation? simulation = null)
+    public Task<HostResult> RunAsync(string[] arguments, string json, HostSimulation? simulation = null)
+        => RunCancellableAsync(arguments, json, simulation, TestContext.Current.CancellationToken);
+
+    /// <summary>Lance un consommateur dont le scénario concurrent peut demander le nettoyage.</summary>
+    /// <param name="arguments">Arguments applicatifs ajoutés à la commande du consommateur compilé.</param>
+    /// <param name="json">Événement natif écrit sur stdin.</param>
+    /// <param name="simulation">Mode de simulation, ou null pour conserver l'environnement.</param>
+    /// <param name="cancellationToken">Annulation extérieure liée au délai technique de trente secondes.</param>
+    /// <returns>Le résultat capturé après terminaison et nettoyage de l'arbre de processus.</returns>
+    public async Task<HostResult> RunCancellableAsync(string[] arguments, string json, HostSimulation? simulation,
+        CancellationToken cancellationToken)
     {
         ProcessStartInfo start = CreateStartInfo(arguments, simulation);
         using Process process = Process.Start(start)!;
-        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         return await RunStartedAsync(process, json, timeout.Token);
     }
 

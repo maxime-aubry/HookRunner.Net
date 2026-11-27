@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Pipes;
 using HookRunner.Domain;
 
 namespace HookRunner.TestHost;
@@ -17,6 +18,9 @@ internal static class HookFailureSimulation
     {
         switch (mode)
         {
+            case "gated":
+                await ExecuteGatedAsync(output, cancellationToken);
+                break;
             case "wait":
             case "uncooperative-wait":
                 await WaitAsync(mode, output, cancellationToken);
@@ -30,6 +34,32 @@ internal static class HookFailureSimulation
                 throw new HookValidationException("Consumer correction required.");
             case "validation-failure-message":
                 throw new HookValidationException(Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_RESULT") ?? string.Empty);
+        }
+    }
+
+    /// <summary>Signale l'entrée du hook puis attend le verdict explicitement autorisé par le test.</summary>
+    /// <param name="output">Préfixe du témoin d'entrée, publié avant toute attente sur le canal.</param>
+    /// <param name="cancellationToken">Annulation du hook et des échanges sur le canal.</param>
+    /// <returns>Une tâche terminée au succès ou portant l'exception correspondant au verdict autorisé.</returns>
+    /// <exception cref="HookValidationException">Le test demande une correction métier.</exception>
+    /// <exception cref="InvalidOperationException">Le test demande une panne technique.</exception>
+    private static async Task ExecuteGatedAsync(string output, CancellationToken cancellationToken)
+    {
+        await File.WriteAllTextAsync(output + ".entered", Environment.ProcessId.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        string name = Environment.GetEnvironmentVariable("HOOKRUNNER_TEST_RESULT")!;
+        await using NamedPipeClientStream pipe = new(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(cancellationToken);
+        await pipe.WriteAsync(new byte[] { 1 }, cancellationToken);
+        byte[] outcome = new byte[1];
+        await pipe.ReadExactlyAsync(outcome, cancellationToken);
+        if (outcome[0] == 1)
+        {
+            throw new HookValidationException("Consumer correction required.");
+        }
+
+        if (outcome[0] == 2)
+        {
+            throw new InvalidOperationException("Consumer technical failure.");
         }
     }
 

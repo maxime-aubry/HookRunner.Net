@@ -63,6 +63,22 @@ Un lien physique conserve l'ancien document publié avant l'autorisation des
 écritures : son contenu reste inchangé après publication, ce qui détecte une
 réécriture du fichier en place. `FileSnapshot` crée ce lien avec `fsutil`
 sous Windows et `ln` sous Unix, sans garder ouvert le fichier remplacé.
+[`StateFileObservation`](../../tests/HookRunner.ExecutionTests/Support/StateFileObservation.cs)
+rouvre directement le chemin publié sans prendre le verrou de document. Une
+première lecture complète précède la libération des hooks ; les lectures
+continuent pendant leurs publications et une dernière suit leur terminaison.
+Chaque instantané doit rester un JSON complet avec l'entrée préexistante et
+des compteurs cohérents. L'ouverture partage aussi le droit de suppression
+pour permettre le remplacement sous Windows ; aucune erreur d'accès ou de
+lecture n'est masquée par une nouvelle tentative.
+[`StatePublicationTests`](../../tests/HookRunner.ExecutionTests/Infrastructure/StatePublicationTests.cs)
+conserve explicitement un lecteur ouvert pendant une sauvegarde réelle :
+l'ancien handle doit lire le compteur précédent et le chemin publié le suivant.
+Ce scénario reproduit sans dépendre de l'ordonnancement le refus de `File.Move`
+sous Windows. Les contrats et erreurs de l'appel natif, son tampon Unicode et
+la propriété du handle sont vérifiés par
+[`WindowsStateFilePublisherTests`](../../tests/HookRunner.ExecutionTests/Infrastructure/WindowsStateFilePublisherTests.cs)
+avec des appels natifs simulés, exécutables sur les trois systèmes.
 Une frontière d'exécution contrôlée avec l'horloge manuelle suspend la
 confirmation d'arrêt pendant qu'un autre processus tente la même identité ;
 le verrou reste détenu jusqu'à confirmation, même en cas d'échec technique,

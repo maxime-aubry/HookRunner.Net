@@ -73,17 +73,19 @@ public sealed class HostConcurrencyTests
         string snapshot = Path.Combine(fixture.Root, "published-snapshot.json");
         await FileSnapshot.CreateHardLinkAsync(snapshot, Path.Combine(fixture.Root, "Hooks", "state.json"), TestContext.Current.CancellationToken);
         string original = await File.ReadAllTextAsync(snapshot, TestContext.Current.CancellationToken);
-        await Task.WhenAll(first.ReleaseAsync(1), second.ReleaseAsync(1), third.ReleaseAsync(1));
-        await using RunningConsumer reading = new(host, Arguments(), Json(fixture, "existing"), new HostSimulation("validation-failure", null));
+        using JsonDocument initial = JsonDocument.Parse(original);
+        string existingKey = Assert.Single(initial.RootElement.GetProperty("Counters").EnumerateObject()).Name;
+        await StateFileObservation.VerifyAsync(Path.Combine(fixture.Root, "Hooks", "state.json"), async () =>
+        {
+            await Task.WhenAll(first.ReleaseAsync(1), second.ReleaseAsync(1), third.ReleaseAsync(1));
+            await Task.WhenAll(one.Execution, two.Execution, three.Execution);
+        }, document => AssertPublishedCounters(document, existingKey));
         HostResult[] results = await Task.WhenAll(one.Execution, two.Execution, three.Execution);
         Assert.All(results, result =>
         {
             Assert.Equal(2, result.ExitCode);
             Assert.Contains("requested corrections", result.Error, StringComparison.Ordinal);
         });
-        HostResult read = await reading.Execution;
-        Assert.Equal(0, read.ExitCode);
-        Assert.Contains("reached its correction request limit", read.Error, StringComparison.Ordinal);
         Assert.Equal(original, await File.ReadAllTextAsync(snapshot, TestContext.Current.CancellationToken));
 
         foreach (string session in new[] { "existing", "one", "two", "three" })
@@ -94,6 +96,19 @@ public sealed class HostConcurrencyTests
         }
 
         Assert.Empty(Directory.GetFiles(Path.Combine(fixture.Root, "Hooks"), "*.tmp"));
+    }
+
+    /// <summary>Chaque lecture directe doit contenir un document entier et conserver l'entrée préexistante.</summary>
+    /// <param name="document">Instantané lu au chemin publié sans verrou de stockage.</param>
+    /// <param name="existingKey">Entrée présente avant toute autorisation d'écriture concurrente.</param>
+    private static void AssertPublishedCounters(JsonElement document, string existingKey)
+    {
+        Assert.Equal(1, document.GetProperty("Version").GetInt32());
+        JsonElement counters = document.GetProperty("Counters");
+        Assert.Equal(1, counters.GetProperty(existingKey).GetInt32());
+        JsonProperty[] entries = [.. counters.EnumerateObject()];
+        Assert.InRange(entries.Length, 1, 4);
+        Assert.All(entries, entry => Assert.Equal(1, entry.Value.GetInt32()));
     }
 
     /// <summary>Le verrou reste détenu pendant la confirmation, puis est libéré même si celle-ci échoue.</summary>

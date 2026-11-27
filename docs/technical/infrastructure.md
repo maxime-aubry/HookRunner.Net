@@ -60,7 +60,20 @@ d'empreintes vers des entiers non négatifs. Les propriétés manquantes, inconn
 dupliquées, nulles ou invalides sont refusées sans réécrire le document.
 
 Chaque écriture utilise un temporaire adjacent, synchronisé sur disque puis
-renommé sur la destination. Les fichiers `.lock` adjacents sont des supports de
+publié par [StateFilePublisher](../../src/HookRunner.Infrastructure/Storage/StateFilePublisher.cs).
+Sous Unix, la publication utilise `File.Move` avec remplacement. Sous Windows,
+[WindowsStateFilePublisher](../../src/HookRunner.Infrastructure/Storage/WindowsStateFilePublisher.cs)
+ouvre le temporaire avec le droit `DELETE` et soumet `FileRenameInfoEx` avec
+`FILE_RENAME_REPLACE_IF_EXISTS | FILE_RENAME_POSIX_SEMANTICS`. Les lecteurs
+existants conservent l'ancien document ; les nouvelles ouvertures obtiennent
+le nouveau sans suppression préalable du chemin. `File.Move` refuse ici une
+destination ouverte sous Windows et `File.Replace` peut exposer un chemin
+momentanément absent. Le renommage étendu exige un système de fichiers qui le
+prend en charge ; une erreur native remonte comme `IOException` avec son
+`Win32Exception` d'origine, sans repli sur une publication non atomique.
+Les contrats natifs sont décrits par
+[Microsoft](https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information).
+Les fichiers `.lock` adjacents sont des supports de
 verrouillage stables, sans compteur. Ils restent en place après libération pour
 éviter qu'un autre processus verrouille un inode différent. Les erreurs de
 partage sont retentées avec le token du budget global ; les autres erreurs

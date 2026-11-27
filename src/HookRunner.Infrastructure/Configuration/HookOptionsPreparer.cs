@@ -14,6 +14,7 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
 {
     private readonly Dictionary<string, int> limits = hookLimits is null
         ? new(StringComparer.OrdinalIgnoreCase) : new(hookLimits, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Valide les options puis cherche la première solution ascendante depuis le dossier de l'agent.
     /// </summary>
@@ -28,7 +29,7 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     /// </remarks>
     /// <exception cref="ArgumentNullException">Les arguments ou l'invocation sont null.</exception>
     /// <exception cref="InvalidDataException">
-    /// Le timeout, le chemin d'état ou la sélection de projets est invalide.
+    /// Le timeout, le plafond de demandes de correction, le chemin d'état ou la sélection de projets est invalide.
     /// </exception>
     /// <exception cref="DirectoryNotFoundException">
     /// Aucun dossier ascendant ne contient de solution, ou le dossier de départ est introuvable.
@@ -37,17 +38,21 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(invocation);
-        int timeout = ResolveTimeoutSeconds(args.TimeoutSeconds);
-        StateFilePathResolver statePath = new(stateFilePath);
-        int limit = limits.GetValueOrDefault(args.HookName, maxBlockingRequests);
-        if (limit < 0)
-        {
-            throw new InvalidDataException("MaxBlockingRequests must be non-negative.");
-        }
+        int timeoutSeconds = ResolveTimeoutSeconds(args.TimeoutSeconds);
+        StateFilePathResolver statePathResolver = new(stateFilePath);
+        int blockingRequestLimit = ResolveMaxBlockingRequests(args.HookName);
 
-        string root = SolutionRootLocator.Find(invocation.WorkingDirectory);
-        IReadOnlyList<TargetProject> projects = TargetProjectResolver.Resolve(root, args.Projects);
-        return new HookOptions(timeout, root, root, projects, statePath.Resolve(root), limit);
+        string solutionRoot = SolutionRootLocator.Find(invocation.WorkingDirectory);
+        IReadOnlyList<TargetProject> projects = TargetProjectResolver.Resolve(solutionRoot, args.Projects);
+        string resolvedStateFilePath = statePathResolver.Resolve(solutionRoot);
+
+        return new HookOptions(
+            TimeoutSeconds: timeoutSeconds,
+            SolutionRoot: solutionRoot,
+            DefaultWorkingDirectory: solutionRoot,
+            Projects: projects,
+            StateFilePath: resolvedStateFilePath,
+            MaxBlockingRequests: blockingRequestLimit);
     }
 
     /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>
@@ -63,5 +68,20 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
         }
 
         return timeout;
+    }
+
+    /// <summary>Applique la surcharge du hook au plafond global puis valide sa valeur effective.</summary>
+    /// <param name="hookName">Nom du hook recherché sans distinction de casse.</param>
+    /// <returns>Le plafond effectif de demandes de correction, supérieur ou égal à zéro.</returns>
+    /// <exception cref="InvalidDataException">Le plafond effectif est négatif.</exception>
+    private int ResolveMaxBlockingRequests(string hookName)
+    {
+        int limit = limits.GetValueOrDefault(hookName, maxBlockingRequests);
+        if (limit < 0)
+        {
+            throw new InvalidDataException("MaxBlockingRequests must be non-negative.");
+        }
+
+        return limit;
     }
 }

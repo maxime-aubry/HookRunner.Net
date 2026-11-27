@@ -26,7 +26,7 @@ internal static class SolutionRootLocator
     /// <summary>Reconnaît les deux extensions de solution sans distinction de casse.</summary>
     /// <param name="file">Fichier du dossier en cours d'exploration.</param>
     /// <returns>True pour une extension .sln ou .slnx ; sinon false.</returns>
-    private static bool IsSolution(FileInfo file)
+    internal static bool IsSolution(FileInfo file)
         => file.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase)
             || file.Extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase);
 }

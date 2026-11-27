@@ -18,10 +18,9 @@ porte l'agent `codex` et n'invente pas de projet ni de session de secours.
 `Prepare` applique la surcharge du timeout, valide sa positivité et exige
 un chemin d'état configuré relatif à la racine. Les chemins enracinés et les
 destinations normalisées hors de la solution sont refusés avant l'exécution.
-La sélection de projets est encore refusée.
 Depuis le dossier de l'agent, il remonte jusqu'au premier dossier contenant
 un fichier `.sln` ou `.slnx`. La racine devient le dossier par défaut ; le
-chemin d'état y est résolu et la liste de projets reste vide. Il ne crée
+chemin d'état y est résolu. Sans sélection, la liste de projets reste vide. Il ne crée
 pas d'état et ne déclenche aucune minuterie.
 
 La recherche ascendante appartient à
@@ -31,6 +30,20 @@ regroupe la validation du chemin configuré et son confinement dans la solution.
 Le contrôle porte aussi sur la destination physique des liens : une jonction
 vers un autre lecteur Windows est refusée avant l'ouverture de l'état.
 Le préparateur conserve l'ordre des validations et assemble les options finales.
+
+[TargetProjectResolver](../../src/HookRunner.Infrastructure/Configuration/TargetProjectResolver.cs)
+lit toutes les solutions du dossier retenu avec `Microsoft.VisualStudio.SolutionPersistence`,
+sans explorer les autres niveaux ni évaluer les fichiers projets. Les noms sont
+ceux des fichiers `.csproj` sans extension : espaces périphériques retirés,
+comparaison insensible à la casse, demandes et références au même fichier physique
+dédupliquées. L'ordre des demandes est conservé.
+
+Seuls les noms demandés peuvent provoquer un diagnostic d'ambiguïté. Un nom
+vide, un chemin, un joker, une correspondance partielle ou un projet non référencé,
+non C#, absent ou hors racine est refusé avant toute exécution et tout accès aux
+compteurs. Le confinement vérifie aussi les destinations physiques des liens.
+Les projets sélectionnés exposent leur nom et les chemins absolus du fichier
+et de son dossier. Plusieurs projets sont transmis dans une unique invocation.
 
 ## Persistance des compteurs
 

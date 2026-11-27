@@ -20,7 +20,7 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     /// <param name="args">Arguments de l'invocation, dont l'éventuelle surcharge du timeout.</param>
     /// <param name="invocation">Données de l'événement fournissant le point de départ de la recherche.</param>
     /// <returns>
-    /// Les options avec timeout effectif, racine comme dossier par défaut, projets vides et chemin d'état absolu.
+    /// Les options avec timeout effectif, racine comme dossier par défaut, projets résolus et chemin d'état absolu.
     /// </returns>
     /// <remarks>
     /// Le timeout est transmis sans déclencher de minuterie. Aucun fichier d'état n'est créé. Une solution .sln ou
@@ -28,10 +28,7 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     /// </remarks>
     /// <exception cref="ArgumentNullException">Les arguments ou l'invocation sont null.</exception>
     /// <exception cref="InvalidDataException">
-    /// Le timeout n'est pas positif, ou le chemin d'état est vide, enraciné ou sort de la racine de solution.
-    /// </exception>
-    /// <exception cref="NotSupportedException">
-    /// Une sélection de projets est demandée, fonctionnalité encore non implémentée.
+    /// Le timeout, le chemin d'état ou la sélection de projets est invalide.
     /// </exception>
     /// <exception cref="DirectoryNotFoundException">
     /// Aucun dossier ascendant ne contient de solution, ou le dossier de départ est introuvable.
@@ -42,11 +39,6 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
         ArgumentNullException.ThrowIfNull(invocation);
         int timeout = ResolveTimeoutSeconds(args.TimeoutSeconds);
         StateFilePathResolver statePath = new(stateFilePath);
-        if (args.Projects.Count != 0)
-        {
-            throw new NotSupportedException("Project selection is not available yet.");
-        }
-
         int limit = limits.GetValueOrDefault(args.HookName, maxBlockingRequests);
         if (limit < 0)
         {
@@ -54,7 +46,8 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
         }
 
         string root = SolutionRootLocator.Find(invocation.WorkingDirectory);
-        return new HookOptions(timeout, root, root, [], statePath.Resolve(root), limit);
+        IReadOnlyList<TargetProject> projects = TargetProjectResolver.Resolve(root, args.Projects);
+        return new HookOptions(timeout, root, root, projects, statePath.Resolve(root), limit);
     }
 
     /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>

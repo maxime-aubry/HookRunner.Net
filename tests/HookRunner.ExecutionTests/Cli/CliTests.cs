@@ -45,11 +45,11 @@ public sealed class CliTests
     }
 
     /// <summary>
-    /// Vérifie qu'une sélection de projets encore non supportée échoue avant d'atteindre l'exécuteur.
+    /// Vérifie qu'un projet inconnu échoue avant d'atteindre l'exécuteur ou de créer l'état.
     /// </summary>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
     [Fact]
-    public async Task ProjectSelectionIsRejectedBeforeAnyHookExecutesInThisMilestone()
+    public async Task UnknownProjectIsRejectedBeforeAnyHookExecutes()
     {
         using SolutionFixture fixture = new();
         using ConsoleCapture console = new(EventJson(fixture.Root));
@@ -63,8 +63,9 @@ public sealed class CliTests
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, exit);
-        Assert.Contains("Project selection", console.Error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("not referenced", console.Error.ToString(), StringComparison.Ordinal);
         Assert.Null(executor.Request);
+        Assert.False(Directory.Exists(Path.Combine(fixture.Root, "Hooks")));
     }
 
     /// <summary>

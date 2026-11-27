@@ -70,17 +70,31 @@ public sealed class HostTests
     /// préparées.
     /// </summary>
     /// <param name="useAppHost">True pour lancer l'apphost, false pour lancer l'assembly avec dotnet.</param>
+    /// <param name="selectProjects">True vérifie la transmission de plusieurs projets à la stratégie enfant.</param>
     /// <returns>Une tâche représentant le scénario de test et ses assertions.</returns>
     /// <remarks>
     /// Une configuration contradictoire dans le dossier de lancement démontre que celle du programme compilé est
     /// utilisée.
     /// </remarks>
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ConsumerExecutesItsOwnHookInAChildWithTheSameComposition(bool useAppHost)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ConsumerExecutesItsOwnHookInAChildWithTheSameComposition(bool useAppHost, bool selectProjects)
     {
         using SolutionFixture fixture = new();
+        string[] arguments = ["execute", "INSPECT", "--agent", "codex"];
+        if (selectProjects)
+        {
+            File.WriteAllText(Path.Combine(fixture.Root, "Api.csproj"), "<Project />");
+            File.WriteAllText(Path.Combine(fixture.Root, "Worker.csproj"), "<Project />");
+            File.WriteAllText(Path.Combine(fixture.Root, "Example.slnx"), """
+                <Solution><Project Path="Api.csproj" /><Project Path="Worker.csproj" /></Solution>
+                """);
+            arguments = [.. arguments, "--projects", " api ,WORKER,Api"];
+        }
+
         string observationPath = Path.Combine(fixture.Root, "observation.json");
         string json = JsonSerializer.Serialize(new
         {
@@ -93,7 +107,7 @@ public sealed class HostTests
         File.WriteAllText(Path.Combine(fixture.Root, "appsettings.json"), "not valid JSON");
 
         ConsumerHost host = new(fixture.Root, useAppHost);
-        HostResult result = await host.RunAsync(["execute", "INSPECT", "--agent", "codex"], json);
+        HostResult result = await host.RunAsync(arguments, json);
 
         Assert.True(result.ExitCode == 0, $"Exit {result.ExitCode}: {result.Error}");
         Assert.Empty(result.Output);
@@ -109,7 +123,18 @@ public sealed class HostTests
         Assert.Equal(37, options.TimeoutSeconds);
         Assert.Equal(fixture.Root, options.SolutionRoot);
         Assert.Equal(fixture.Root, options.DefaultWorkingDirectory);
-        Assert.Empty(options.Projects);
+        if (selectProjects)
+        {
+            Assert.Equal(
+            [
+                new TargetProject("Api", Path.Combine(fixture.Root, "Api.csproj"), fixture.Root),
+                new TargetProject("Worker", Path.Combine(fixture.Root, "Worker.csproj"), fixture.Root),
+            ], options.Projects);
+        }
+        else
+        {
+            Assert.Empty(options.Projects);
+        }
         Assert.True(File.Exists(options.StateFilePath));
     }
 

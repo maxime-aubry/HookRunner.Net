@@ -55,7 +55,7 @@ Sources : [TargetProject](../../src/HookRunner.Application/Hooks/Options/TargetP
 `TargetProject` est un `record` public scellé de constructeur
 `TargetProject(string Name, string ProjectFilePath, string DirectoryPath)`.
 Il décrit le nom d'un projet cible, le chemin de son `.csproj` et son dossier.
-La résolution effective des projets cibles n'est pas encore implémentée.
+Le préparateur résout les seuls noms demandés à partir des solutions retenues.
 
 `HookOptions` est un `record` public scellé dont le constructeur expose :
 
@@ -64,7 +64,7 @@ La résolution effective des projets cibles n'est pas encore implémentée.
 | `TimeoutSeconds` | `int` | Budget effectif positif, appliqué par Context au démarrage et à l'exécution du hook isolé. |
 | `SolutionRoot` | `string` | Premier dossier ascendant contenant une solution. |
 | `DefaultWorkingDirectory` | `string` | Dossier de lancement de l'enfant ; actuellement égal à `SolutionRoot`. |
-| `Projects` | `IReadOnlyList<TargetProject>` | Projets résolus ; liste vide dans le parcours superviseur actuel. |
+| `Projects` | `IReadOnlyList<TargetProject>` | Projets résolus ; liste vide en l'absence de sélection. |
 | `StateFilePath` | `string` | Chemin absolu du fichier partagé de compteurs. |
 | `MaxBlockingRequests` | `int` | Plafond effectif de demandes, trois par défaut ; zéro désactive les blocages métier. |
 

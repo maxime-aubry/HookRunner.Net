@@ -60,6 +60,56 @@ public sealed class ProjectSelectionTests
         Assert.Equal(project, Assert.Single(options.Projects).ProjectFilePath);
     }
 
+    /// <summary>Des noms distincts vers le même fichier physique ne sélectionnent qu'un projet.</summary>
+    /// <param name="aliasFirst">True demande l'alias en premier et conserve ce nom dans les options.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DeduplicatesDifferentFileNamesForTheSamePhysicalProject(bool aliasFirst)
+    {
+        using SolutionFixture fixture = new();
+        string project = CreateProject(fixture.Root, "src/Api.csproj");
+        string alias = Path.Combine(fixture.Root, "Alias.csproj");
+        CreateFileAlias(alias, project);
+        File.WriteAllText(Path.Combine(fixture.Root, "Example.slnx"),
+            "<Solution><Project Path=\"src/Api.csproj\" /></Solution>");
+        File.WriteAllText(Path.Combine(fixture.Root, "Other.slnx"),
+            "<Solution><Project Path=\"Alias.csproj\" /></Solution>");
+        string[] names = ["Api", "Alias"];
+        string expectedPath = project;
+        if (aliasFirst)
+        {
+            names = ["Alias", "Api"];
+            expectedPath = alias;
+        }
+
+        HookOptions options = new HookOptionsPreparer(120, "Hooks/state.json")
+            .Prepare(new RunHookArgs("hook", null, names), fixture.Invocation);
+
+        Assert.Equal(new TargetProject(names[0], expectedPath, Path.GetDirectoryName(expectedPath)!),
+            Assert.Single(options.Projects));
+    }
+
+    /// <summary>Un alias ambigu reste invalide même si l'une de ses cibles a déjà été sélectionnée.</summary>
+    [Fact]
+    public void RejectsAnAmbiguousAliasAfterSelectingItsPhysicalTarget()
+    {
+        using SolutionFixture fixture = new();
+        string project = CreateProject(fixture.Root, "Api.csproj");
+        CreateFileAlias(Path.Combine(fixture.Root, "Alias.csproj"), project);
+        CreateProject(fixture.Root, "other/Alias.csproj");
+        File.WriteAllText(Path.Combine(fixture.Root, "Example.slnx"),
+            "<Solution><Project Path=\"Api.csproj\" /><Project Path=\"Alias.csproj\" /></Solution>");
+        File.WriteAllText(Path.Combine(fixture.Root, "Other.slnx"),
+            "<Solution><Project Path=\"other/Alias.csproj\" /></Solution>");
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            new HookOptionsPreparer(120, "Hooks/state.json")
+                .Prepare(new RunHookArgs("hook", null, ["Api", "Alias"]), fixture.Invocation));
+
+        Assert.Contains("ambiguous", exception.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>Un projet référencé hors racine reste refusé, même derrière un lien de dossier.</summary>
     /// <param name="throughLink">True passe par un chemin logique situé dans la racine.</param>
     [Theory]
@@ -219,5 +269,21 @@ public sealed class ProjectSelectionTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><AssemblyName>NotTheFileName</AssemblyName></PropertyGroup></Project>");
         return path;
+    }
+
+    /// <summary>Crée un alias de fichier ou signale le privilège Windows manquant au moteur de tests.</summary>
+    /// <param name="path">Chemin du lien, nettoyé avec la fixture propriétaire.</param>
+    /// <param name="target">Fichier projet physique existant.</param>
+    /// <exception cref="IOException">La création échoue pour une raison autre que le privilège Windows requis.</exception>
+    private static void CreateFileAlias(string path, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(path, target);
+        }
+        catch (IOException exception) when (OperatingSystem.IsWindows() && (exception.HResult & 0xFFFF) == 1314)
+        {
+            Assert.Skip("Creating file symbolic links requires Windows Developer Mode or the symbolic-link privilege.");
+        }
     }
 }

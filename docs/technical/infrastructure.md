@@ -37,6 +37,8 @@ sans explorer les autres niveaux ni évaluer les fichiers projets. Les noms sont
 ceux des fichiers `.csproj` sans extension : espaces périphériques retirés,
 comparaison insensible à la casse, demandes et références au même fichier physique
 dédupliquées. L'ordre des demandes est conservé.
+Lorsque plusieurs noms désignent le même fichier physique, seuls le nom et le
+chemin de la première demande sont conservés, après validation de tous les noms.
 
 Seuls les noms demandés peuvent provoquer un diagnostic d'ambiguïté. Un nom
 vide, un chemin, un joker, une correspondance partielle ou un projet non référencé,

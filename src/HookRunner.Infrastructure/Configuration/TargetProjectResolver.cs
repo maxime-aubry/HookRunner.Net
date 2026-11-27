@@ -48,7 +48,7 @@ internal static class TargetProjectResolver
             selected.Add(new TargetProject(Path.GetFileNameWithoutExtension(path), path, Path.GetDirectoryName(path)!));
         }
 
-        return selected;
+        return [.. selected.DistinctBy(project => CanonicalPath.Resolve(project.ProjectFilePath), StringComparer.Ordinal)];
     }
 
     /// <summary>Vérifie le périmètre physique, notamment en présence de liens de dossier.</summary>

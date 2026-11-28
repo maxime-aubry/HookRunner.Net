@@ -1,8 +1,5 @@
 using HookRunner.Application;
-using Microsoft.Build.Construction;
-using Microsoft.VisualStudio.SolutionPersistence;
 using Microsoft.VisualStudio.SolutionPersistence.Model;
-using Microsoft.VisualStudio.SolutionPersistence.Serializer;
 
 namespace HookRunner.Infrastructure;
 
@@ -29,41 +26,60 @@ internal static class TargetProjectResolver
         }
 
         string[] names = [.. requestedNames.Select(ValidateName).Distinct(StringComparer.OrdinalIgnoreCase)];
-        string[] references = [.. ReadProjectPaths(root).Distinct(StringComparer.Ordinal)];
-        List<TargetProject> selected = [];
-        foreach (string name in names)
-        {
-            string[] matches = [.. references.Where(path => Path.GetFileNameWithoutExtension(path).Equals(name, StringComparison.OrdinalIgnoreCase)).DistinctBy(CanonicalPath.Resolve, StringComparer.Ordinal)];
-            if (matches.Length == 0)
-            {
-                throw new InvalidDataException($"Project '{name}' is not referenced as a C# project in the selected solutions.");
-            }
-
-            if (matches.Length > 1)
-            {
-                throw new InvalidDataException($"Project name '{name}' is ambiguous: {string.Join(", ", matches)}.");
-            }
-
-            string path = matches[0];
-            if (!File.Exists(path))
-            {
-                throw new InvalidDataException($"Project '{name}' does not exist: '{path}'.");
-            }
-
-            ValidateLocation(root, path, name);
-            selected.Add(new TargetProject(Path.GetFileNameWithoutExtension(path), path, Path.GetDirectoryName(path)!));
-        }
+        IReadOnlyList<string> references = SolutionProjectReader.Read(root);
+        TargetProject[] selected = [.. names.Select(name => ResolveProject(root, references, name))];
 
         return [.. selected.DistinctBy(project => CanonicalPath.Resolve(project.ProjectFilePath), StringComparer.Ordinal)];
     }
 
-    /// <summary>Vérifie le périmètre physique, notamment en présence de liens de dossier.</summary>
+    /// <summary>Résout un nom unique et vérifie le fichier avant de construire le projet cible.</summary>
     /// <param name="root">Racine de la solution.</param>
-    /// <param name="path">Fichier projet existant demandé.</param>
-    /// <param name="name">Nom demandé utilisé dans le diagnostic.</param>
-    /// <exception cref="InvalidDataException">Le fichier projet sort de la racine.</exception>
-    private static void ValidateLocation(string root, string path, string name)
+    /// <param name="references">Chemins absolus des projets C# référencés.</param>
+    /// <param name="name">Nom demandé validé.</param>
+    /// <returns>Le projet cible avec son chemin logique et son nom de fichier.</returns>
+    /// <exception cref="InvalidDataException">Le nom est inconnu ou ambigu, ou le fichier est absent ou hors racine.</exception>
+    private static TargetProject ResolveProject(string root, IReadOnlyList<string> references, string name)
     {
+        string path = FindUniqueProjectPath(references, name);
+        ValidateProjectFile(root, path, name);
+        return new TargetProject(Path.GetFileNameWithoutExtension(path), path, Path.GetDirectoryName(path)!);
+    }
+
+    /// <summary>Exige une seule correspondance physique pour le nom demandé.</summary>
+    /// <param name="references">Chemins absolus des projets C# référencés.</param>
+    /// <param name="name">Nom demandé validé, comparé sans distinction de casse.</param>
+    /// <returns>Le premier chemin logique correspondant au fichier physique unique.</returns>
+    /// <exception cref="InvalidDataException">Le nom est inconnu ou désigne plusieurs fichiers physiques.</exception>
+    private static string FindUniqueProjectPath(IReadOnlyList<string> references, string name)
+    {
+        string[] matches = [.. references
+            .Where(path => Path.GetFileNameWithoutExtension(path).Equals(name, StringComparison.OrdinalIgnoreCase))
+            .DistinctBy(CanonicalPath.Resolve, StringComparer.Ordinal)];
+        if (matches.Length == 0)
+        {
+            throw new InvalidDataException($"Project '{name}' is not referenced as a C# project in the selected solutions.");
+        }
+
+        if (matches.Length > 1)
+        {
+            throw new InvalidDataException($"Project name '{name}' is ambiguous: {string.Join(", ", matches)}.");
+        }
+
+        return matches[0];
+    }
+
+    /// <summary>Exige un fichier existant dans le périmètre physique, même en présence de liens.</summary>
+    /// <param name="root">Racine de la solution.</param>
+    /// <param name="path">Fichier projet demandé.</param>
+    /// <param name="name">Nom demandé utilisé dans le diagnostic.</param>
+    /// <exception cref="InvalidDataException">Le fichier projet est absent ou sort de la racine.</exception>
+    private static void ValidateProjectFile(string root, string path, string name)
+    {
+        if (!File.Exists(path))
+        {
+            throw new InvalidDataException($"Project '{name}' does not exist: '{path}'.");
+        }
+
         string canonicalRoot = CanonicalPath.Resolve(root);
         string canonicalPath = CanonicalPath.Resolve(path);
         if (!CanonicalPath.IsWithinRoot(canonicalRoot, canonicalPath))
@@ -84,53 +100,5 @@ internal static class TargetProjectResolver
         }
 
         return name.Trim();
-    }
-
-    /// <summary>Lit les formats de solution avec le parseur Microsoft sans charger ni évaluer les projets.</summary>
-    /// <param name="root">Dossier des solutions ; aucun parent ni sous-dossier n'est exploré.</param>
-    /// <returns>Les chemins absolus normalisés des projets C# référencés.</returns>
-    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">Une solution .sln est illisible ou mal formée.</exception>
-    /// <exception cref="SolutionException">Une solution .slnx ne respecte pas le format attendu.</exception>
-    /// <exception cref="IOException">L'énumération du dossier ou la lecture d'une solution échoue.</exception>
-    /// <exception cref="UnauthorizedAccessException">L'accès au dossier ou à une solution est refusé.</exception>
-    /// <remarks>La lecture est différée à l'énumération ; ses erreurs remontent sans interception.</remarks>
-    private static IEnumerable<string> ReadProjectPaths(string root)
-    {
-        foreach (FileInfo solution in new DirectoryInfo(root).EnumerateFiles().Where(SolutionRootLocator.IsSolution).OrderBy(file => file.Name, StringComparer.Ordinal))
-        {
-            foreach (string projectPath in ReadSolutionProjectPaths(solution))
-            {
-                string path = projectPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
-                if (Path.GetExtension(path).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
-                {
-                    yield return Path.GetFullPath(path, root);
-                }
-            }
-        }
-    }
-
-    /// <summary>Lit les références sans imposer aux solutions classiques l'unicité des noms de fichiers projets.</summary>
-    /// <param name="solution">Solution du dossier retenu.</param>
-    /// <returns>Chemins des projets tels qu'ils sont référencés dans la solution.</returns>
-    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">La solution .sln est illisible ou mal formée.</exception>
-    /// <exception cref="SolutionException">La solution .slnx ne respecte pas le format attendu.</exception>
-    /// <exception cref="IOException">La lecture du fichier de solution échoue.</exception>
-    /// <exception cref="UnauthorizedAccessException">L'accès au fichier de solution est refusé.</exception>
-    /// <remarks>Les erreurs de lecture et d'analyse du parseur choisi remontent sans interception.</remarks>
-    private static IEnumerable<string> ReadSolutionProjectPaths(FileInfo solution)
-    {
-        if (solution.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase))
-        {
-            // Le modèle SolutionPersistence exige des noms de fichiers uniques par dossier logique,
-            // alors qu'une solution classique peut contenir une ambiguïté non demandée.
-            return SolutionFile.Parse(solution.FullName).ProjectsInOrder
-                .Where(project => project.ProjectType != SolutionProjectType.SolutionFolder)
-                .Select(project => project.RelativePath);
-        }
-
-        ISolutionSerializer serializer = SolutionSerializers.GetSerializerByMoniker(solution.FullName)!;
-        // Le port Prepare est synchrone ; la lecture reste confinée à l'adaptateur de fichiers.
-        SolutionModel model = serializer.OpenAsync(solution.FullName, CancellationToken.None).GetAwaiter().GetResult();
-        return model.SolutionProjects.Select(project => project.FilePath);
     }
 }

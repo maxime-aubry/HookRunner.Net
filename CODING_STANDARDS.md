@@ -25,6 +25,12 @@ meaningfully improve breakpoint placement or inspection. During review, assess
 debuggability rather than brevity; this preference is a judgement call, not a
 blanket syntax ban.
 
+## Sequence transformations
+
+Prefer LINQ for sequence transformations when it keeps the intent readable and
+does not cause a meaningful performance regression. Preserve evaluation order
+and materialize intermediate results when validation or side effects require it.
+
 ## Exception handling
 
 Catch an exception only to recover from it, add useful context, or translate it at

@@ -6,6 +6,39 @@ namespace HookRunner.ExecutionTests;
 /// <summary>Sélection exacte de projets à travers les options publiques préparées.</summary>
 public sealed class ProjectSelectionTests
 {
+    /// <summary>Sans projet demandé, les solutions ne sont pas analysées.</summary>
+    /// <param name="extension">Format de la solution volontairement mal formée.</param>
+    [Theory]
+    [InlineData(".sln")]
+    [InlineData(".slnx")]
+    public void DoesNotReadSolutionsWithoutRequestedProjects(string extension)
+    {
+        using SolutionFixture fixture = new();
+        File.WriteAllText(Path.Combine(fixture.Root, "Broken" + extension), "not a solution");
+
+        HookOptions options = new HookOptionsPreparer(120, "Hooks/state.json")
+            .Prepare(new RunHookArgs("hook", null, []), fixture.Invocation);
+
+        Assert.Empty(options.Projects);
+    }
+
+    /// <summary>Tous les noms sont validés avant la lecture de la moindre solution.</summary>
+    /// <param name="extension">Format de la solution volontairement mal formée.</param>
+    [Theory]
+    [InlineData(".sln")]
+    [InlineData(".slnx")]
+    public void ValidatesAllRequestedNamesBeforeReadingSolutions(string extension)
+    {
+        using SolutionFixture fixture = new();
+        File.WriteAllText(Path.Combine(fixture.Root, "Broken" + extension), "not a solution");
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            new HookOptionsPreparer(120, "Hooks/state.json")
+                .Prepare(new RunHookArgs("hook", null, ["Api", "../Worker"]), fixture.Invocation));
+
+        Assert.Contains("Invalid project name: '../Worker'", exception.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>Après le premier dossier de solutions, les autres niveaux sont ignorés.</summary>
     /// <param name="requested">Nom uniquement référencé dans un autre niveau, ou nom local valide.</param>
     [Theory]

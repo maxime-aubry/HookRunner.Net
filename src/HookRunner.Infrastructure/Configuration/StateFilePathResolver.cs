@@ -38,9 +38,7 @@ internal sealed class StateFilePathResolver
 
         string canonical = CanonicalPath.Resolve(resolved);
         string canonicalRoot = CanonicalPath.Resolve(solutionRoot);
-        // La casse est déjà physique ; le séparateur distingue la racine d'un dossier frère au même préfixe.
-        string rootPrefix = canonicalRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        if (canonical != canonicalRoot && !canonical.StartsWith(rootPrefix, StringComparison.Ordinal))
+        if (!CanonicalPath.IsWithinRoot(canonicalRoot, canonical))
         {
             throw new InvalidDataException("HookRunner:StateFilePath must stay within the solution root.");
         }

@@ -122,8 +122,9 @@ Le code `0` de l'enfant indique que le fichier de résultat a pu être écrit ;
 le statut du hook se lit dans ce fichier. Il peut donc signaler un échec alors
 que le processus enfant a quitté avec `0`.
 
-Seul l'agent `codex` est accepté. La sélection `--projects` est analysée puis
-refusée. `TimeoutSeconds` est préparé puis appliqué par Context comme budget
+Seul l'agent `codex` est accepté. La sélection `--projects Api,Worker` résout
+les noms exacts de fichiers C# dans toutes les solutions du premier dossier retenu,
+avant exécution et accès aux compteurs. `TimeoutSeconds` est préparé puis appliqué par Context comme budget
 unique couvrant l'attente du verrou, le démarrage et l'exécution isolée. La confirmation d'arrêt
 utilise un délai technique distinct de cinq secondes. `StateFilePath` est
 préparé et transmis ; un fichier d'état atomique conserve les compteurs entre lancements.

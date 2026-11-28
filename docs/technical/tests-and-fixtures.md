@@ -14,6 +14,8 @@ privés restent proches des assertions qui les utilisent.
 | [Infrastructure/Agents/Codex/InvocationTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Agents/Codex/InvocationTests.cs) | Champs natifs invalides, session, dossier et conservation exacte du JSON original. |
 | [Infrastructure/Execution/ProcessExecutionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/Execution/ProcessExecutionTests.cs) | Enfant réel, résultats internes invalides, panne de lancement, annulation extérieure et arrêt forcé sur timeout d'un hook ignorant l'annulation. |
 | [Cli/CliTests](../../tests/HookRunner.ExecutionTests/Cli/CliTests.cs) | Arguments, configuration et parcours superviseur. |
+| [Infrastructure/ProjectSelectionTests](../../tests/HookRunner.ExecutionTests/Infrastructure/ProjectSelectionTests.cs) | Solutions `.sln` et `.slnx`, arrêt au premier niveau, noms exacts, déduplication, ambiguïtés et confinement physique. |
+| [Cli/ProjectSelectionHostTests](../../tests/HookRunner.ExecutionTests/Cli/ProjectSelectionHostTests.cs) | Exécution unique pour plusieurs projets et refus sans création ni modification de l'état. |
 | [Cli/ConfigurationLoaderTests](../../tests/HookRunner.ExecutionTests/Cli/ConfigurationLoaderTests.cs) | Chargement, défauts, valeurs numériques et surcharges sur des fichiers JSON dans des dossiers temporaires indépendants. |
 | [Cli/ChildHookTests](../../tests/HookRunner.ExecutionTests/Cli/ChildHookTests.cs) | Transport enfant et données déjà préparées. |
 | [Cli/HostDisposalTests](../../tests/HookRunner.ExecutionTests/Cli/HostDisposalTests.cs) | Libération asynchrone après succès, panne ou erreur de libération. |

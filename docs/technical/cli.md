@@ -36,6 +36,11 @@ options inconnues. Le timeout absent reste `null`. Les projets sont séparés
 par virgules, avec retrait des espaces périphériques ; leur résolution ne
 relève pas de cet analyseur.
 
+Par exemple, `execute inspect --agent codex --projects Api,Worker` transmet
+les deux projets résolus au hook dans une seule invocation. Une valeur explicite
+vide ou contenant un élément vide est refusée pendant la préparation, avant
+toute exécution et tout changement de compteur.
+
 [TimeoutSecondsParser](../../src/HookRunner.Cli/Arguments/TimeoutSecondsParser.cs)
 valide un entier positif Int32 en culture invariante, sans signe ni fraction.
 La commande et la configuration utilisent la même validation.

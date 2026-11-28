@@ -104,7 +104,21 @@ project field, so `Project` is null. Additional fields remain in `OriginalJson`.
 
 The first ascending directory from the event's `cwd` containing a `.sln` or
 `.slnx` is the solution root. With no project selection, `HookOptions.Projects`
-is empty and `DefaultWorkingDirectory` is that root. The hook name is selected
+is empty and `DefaultWorkingDirectory` is that root. Use `--projects Api,Worker`
+to select exact `.csproj` file names without their extension from all solutions
+in that directory. Names are case insensitive, surrounding whitespace is removed,
+and repeated requests or references to the same physical file are deduplicated.
+The first requested name and path are retained when file aliases select the same
+project. The hook receives absolute project and directory paths in a single
+execution, even when several projects are selected.
+
+Empty selections or elements, paths, wildcards, partial names, and requested
+projects that are ambiguous, missing, unreferenced, non-C#, or outside the solution
+root are preparation failures. An ambiguous name that was not requested does not
+block execution. All requested names are validated before execution or access to
+the counters.
+
+The hook name is selected
 case insensitively from all registered strategies; empty, duplicate, and unknown
 names are preparation failures. Preparation failures emit stderr and `2`
 without executing a hook. A successful invocation emits a trace on stderr
@@ -126,11 +140,11 @@ emits a trace and returns `0`; failed confirmation or external cancellation
 emits a diagnostic and returns `2`. Late hook results are ignored. Forced stop
 does not guarantee hook cleanup or roll back file changes.
 
-This milestone implements the Codex execution path (#6), global timeout (#7), and persistent correction counters (#8).
+This milestone implements the Codex execution path (#6), global timeout (#7),
+persistent correction counters (#8), and project selection (#10).
 The following capabilities remain in their own tickets:
 further concurrency scenarios (#9),
-project selection (#10), Claude events (#11), local commands (#12), and prompts
-(#13–#14). `--projects` is rejected until project selection is implemented.
+Claude events (#11), local commands (#12), and prompts (#13–#14).
 
 `fixtures/HookRunner.TestHost` is a deterministic test consumer, not a production
 hook library. After a Release build, run

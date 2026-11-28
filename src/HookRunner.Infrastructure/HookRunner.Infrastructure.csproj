@@ -4,6 +4,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Build" />
+    <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
     <InternalsVisibleTo Include="HookRunner.ExecutionTests" />
     <ProjectReference Include="../HookRunner.Domain/HookRunner.Domain.csproj" />
     <ProjectReference Include="../HookRunner.Application/HookRunner.Application.csproj" />

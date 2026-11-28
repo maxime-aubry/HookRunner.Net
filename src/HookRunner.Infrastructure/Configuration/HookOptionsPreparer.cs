@@ -14,13 +14,14 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
 {
     private readonly Dictionary<string, int> limits = hookLimits is null
         ? new(StringComparer.OrdinalIgnoreCase) : new(hookLimits, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Valide les options puis cherche la première solution ascendante depuis le dossier de l'agent.
     /// </summary>
     /// <param name="args">Arguments de l'invocation, dont l'éventuelle surcharge du timeout.</param>
     /// <param name="invocation">Données de l'événement fournissant le point de départ de la recherche.</param>
     /// <returns>
-    /// Les options avec timeout effectif, racine comme dossier par défaut, projets vides et chemin d'état absolu.
+    /// Les options avec timeout effectif, racine comme dossier par défaut, projets résolus et chemin d'état absolu.
     /// </returns>
     /// <remarks>
     /// Le timeout est transmis sans déclencher de minuterie. Aucun fichier d'état n'est créé. Une solution .sln ou
@@ -28,33 +29,32 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     /// </remarks>
     /// <exception cref="ArgumentNullException">Les arguments ou l'invocation sont null.</exception>
     /// <exception cref="InvalidDataException">
-    /// Le timeout n'est pas positif, ou le chemin d'état est vide, enraciné ou sort de la racine de solution.
-    /// </exception>
-    /// <exception cref="NotSupportedException">
-    /// Une sélection de projets est demandée, fonctionnalité encore non implémentée.
+    /// Le timeout, le plafond de demandes de correction, le chemin d'état ou la sélection de projets est invalide.
     /// </exception>
     /// <exception cref="DirectoryNotFoundException">
     /// Aucun dossier ascendant ne contient de solution, ou le dossier de départ est introuvable.
     /// </exception>
+    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">Une solution .sln est illisible ou mal formée.</exception>
+    /// <exception cref="Microsoft.VisualStudio.SolutionPersistence.Model.SolutionException">Une solution .slnx ne respecte pas le format attendu.</exception>
     public HookOptions Prepare(RunHookArgs args, InvocationData invocation)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(invocation);
-        int timeout = ResolveTimeoutSeconds(args.TimeoutSeconds);
-        StateFilePathResolver statePath = new(stateFilePath);
-        if (args.Projects.Count != 0)
-        {
-            throw new NotSupportedException("Project selection is not available yet.");
-        }
+        int timeoutSeconds = ResolveTimeoutSeconds(args.TimeoutSeconds);
+        StateFilePathResolver statePathResolver = new(stateFilePath);
+        int blockingRequestLimit = ResolveMaxBlockingRequests(args.HookName);
 
-        int limit = limits.GetValueOrDefault(args.HookName, maxBlockingRequests);
-        if (limit < 0)
-        {
-            throw new InvalidDataException("MaxBlockingRequests must be non-negative.");
-        }
+        string solutionRoot = SolutionRootLocator.Find(invocation.WorkingDirectory);
+        IReadOnlyList<TargetProject> projects = TargetProjectResolver.Resolve(solutionRoot, args.Projects);
+        string resolvedStateFilePath = statePathResolver.Resolve(solutionRoot);
 
-        string root = SolutionRootLocator.Find(invocation.WorkingDirectory);
-        return new HookOptions(timeout, root, root, [], statePath.Resolve(root), limit);
+        return new HookOptions(
+            TimeoutSeconds: timeoutSeconds,
+            SolutionRoot: solutionRoot,
+            DefaultWorkingDirectory: solutionRoot,
+            Projects: projects,
+            StateFilePath: resolvedStateFilePath,
+            MaxBlockingRequests: blockingRequestLimit);
     }
 
     /// <summary>Applique la surcharge de commande au timeout configuré puis valide sa positivité.</summary>
@@ -70,5 +70,20 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
         }
 
         return timeout;
+    }
+
+    /// <summary>Applique la surcharge du hook au plafond global puis valide sa valeur effective.</summary>
+    /// <param name="hookName">Nom du hook recherché sans distinction de casse.</param>
+    /// <returns>Le plafond effectif de demandes de correction, supérieur ou égal à zéro.</returns>
+    /// <exception cref="InvalidDataException">Le plafond effectif est négatif.</exception>
+    private int ResolveMaxBlockingRequests(string hookName)
+    {
+        int limit = limits.GetValueOrDefault(hookName, maxBlockingRequests);
+        if (limit < 0)
+        {
+            throw new InvalidDataException("MaxBlockingRequests must be non-negative.");
+        }
+
+        return limit;
     }
 }

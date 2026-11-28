@@ -32,6 +32,16 @@ internal static class CanonicalPath
         return Path.TrimEndingDirectorySeparator(current);
     }
 
+    /// <summary>Compare des chemins physiques déjà normalisés sans confondre les dossiers frères.</summary>
+    /// <param name="canonicalRoot">Racine physique obtenue par Resolve.</param>
+    /// <param name="canonicalPath">Chemin physique à situer, obtenu par Resolve.</param>
+    /// <returns>True pour la racine elle-même ou l'un de ses descendants.</returns>
+    public static bool IsWithinRoot(string canonicalRoot, string canonicalPath)
+    {
+        string rootPrefix = canonicalRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return canonicalPath == canonicalRoot || canonicalPath.StartsWith(rootPrefix, StringComparison.Ordinal);
+    }
+
     /// <summary>Résout un segment existant ou conserve son nom lorsque l'entrée est absente.</summary>
     /// <param name="parent">Chemin physique du parent déjà parcouru.</param>
     /// <param name="segment">Nom du prochain fichier ou dossier.</param>

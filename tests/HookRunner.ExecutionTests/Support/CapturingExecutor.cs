@@ -10,6 +10,9 @@ internal sealed class CapturingExecutor : IIsolatedHookExecutor
     /// </summary>
     public IsolatedHookRequest? Request { get; private set; }
 
+    /// <summary>Nombre d'invocations isolées reçues par cet exécuteur.</summary>
+    public int ExecutionCount { get; private set; }
+
     /// <summary>Mémorise la requête isolée reçue sans démarrer de processus.</summary>
     /// <param name="request">
     /// Requête isolée contenant le nom du hook, l'invocation et les options préparées.
@@ -22,6 +25,7 @@ internal sealed class CapturingExecutor : IIsolatedHookExecutor
     public Task<HookExecutionResult> ExecuteAsync(IsolatedHookRequest request, CancellationToken cancellationToken)
     {
         Request = request;
+        ExecutionCount++;
         return Task.FromResult(new HookExecutionResult(HookExecutionStatus.Success, null));
     }
 }

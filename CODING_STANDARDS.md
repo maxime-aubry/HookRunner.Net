@@ -27,8 +27,8 @@ blanket syntax ban.
 
 ## Sequence transformations
 
-Prefer LINQ for sequence transformations when it keeps the intent readable and
-does not cause a meaningful performance regression. Preserve evaluation order
+Prefer LINQ for sequence operations when it improves readability without
+degrading performance. Preserve evaluation order
 and materialize intermediate results when validation or side effects require it.
 
 ## Exception handling

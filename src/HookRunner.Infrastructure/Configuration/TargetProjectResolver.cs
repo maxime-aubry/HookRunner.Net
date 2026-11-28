@@ -25,11 +25,14 @@ internal static class TargetProjectResolver
             return [];
         }
 
-        string[] names = [.. requestedNames.Select(ValidateName).Distinct(StringComparer.OrdinalIgnoreCase)];
+        ValidateNames(requestedNames);
         IReadOnlyList<string> references = SolutionProjectReader.Read(root);
-        TargetProject[] selected = [.. names.Select(name => ResolveProject(root, references, name))];
 
-        return [.. selected.DistinctBy(project => CanonicalPath.Resolve(project.ProjectFilePath), StringComparer.Ordinal)];
+        return [.. requestedNames
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(name => ResolveProject(root, references, name))
+            .DistinctBy(project => CanonicalPath.Resolve(project.ProjectFilePath), StringComparer.Ordinal)];
     }
 
     /// <summary>Résout un nom unique et vérifie le fichier avant de construire le projet cible.</summary>
@@ -89,16 +92,16 @@ internal static class TargetProjectResolver
     }
 
     /// <summary>Refuse les sélections vides, les chemins et les motifs de recherche.</summary>
-    /// <param name="name">Nom brut demandé.</param>
-    /// <returns>Nom exact débarrassé de ses espaces extérieurs.</returns>
-    /// <exception cref="InvalidDataException">Le nom n'est pas un nom de projet sélectionnable.</exception>
-    private static string ValidateName(string name)
+    /// <param name="names">Noms bruts demandés, tous vérifiés avant la lecture des solutions.</param>
+    /// <exception cref="InvalidDataException">Un nom n'est pas un nom de projet sélectionnable.</exception>
+    private static void ValidateNames(IReadOnlyList<string> names)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(['/', '\\', ':', '*', '?', '[', ']']) >= 0 || name.Trim() is "." or "..")
+        foreach (string name in names)
         {
-            throw new InvalidDataException($"Invalid project name: '{name}'. Specify an exact file name without extension, path or wildcard.");
+            if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(['/', '\\', ':', '*', '?', '[', ']']) >= 0 || name.Trim() is "." or "..")
+            {
+                throw new InvalidDataException($"Invalid project name: '{name}'. Specify an exact file name without extension, path or wildcard.");
+            }
         }
-
-        return name.Trim();
     }
 }

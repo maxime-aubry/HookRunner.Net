@@ -12,7 +12,7 @@ internal static class SolutionRootLocator
         DirectoryInfo? directory = new(workingDirectory);
         while (directory is not null)
         {
-            if (directory.EnumerateFiles().Any(IsSolution))
+            if (ContainsSolution(directory))
             {
                 return directory.FullName;
             }
@@ -22,6 +22,15 @@ internal static class SolutionRootLocator
 
         throw new DirectoryNotFoundException("No solution found above the agent working directory.");
     }
+
+    /// <summary>Détermine si le dossier contient au moins un fichier de solution sans explorer ses sous-dossiers.</summary>
+    /// <param name="directory">Dossier dans lequel rechercher les fichiers de solution.</param>
+    /// <returns>True si un fichier .sln ou .slnx est présent ; sinon false.</returns>
+    /// <exception cref="DirectoryNotFoundException">Le dossier est introuvable.</exception>
+    /// <exception cref="IOException">L'énumération des fichiers échoue.</exception>
+    /// <exception cref="UnauthorizedAccessException">L'accès au dossier est refusé.</exception>
+    private static bool ContainsSolution(DirectoryInfo directory)
+        => directory.EnumerateFiles().Any(IsSolution);
 
     /// <summary>Reconnaît les deux extensions de solution sans distinction de casse.</summary>
     /// <param name="file">Fichier du dossier en cours d'exploration.</param>

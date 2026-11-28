@@ -34,6 +34,8 @@ public sealed class HookOptionsPreparer(int defaultTimeoutSeconds, string stateF
     /// <exception cref="DirectoryNotFoundException">
     /// Aucun dossier ascendant ne contient de solution, ou le dossier de départ est introuvable.
     /// </exception>
+    /// <exception cref="Microsoft.Build.Exceptions.InvalidProjectFileException">Une solution .sln est illisible ou mal formée.</exception>
+    /// <exception cref="Microsoft.VisualStudio.SolutionPersistence.Model.SolutionException">Une solution .slnx ne respecte pas le format attendu.</exception>
     public HookOptions Prepare(RunHookArgs args, InvocationData invocation)
     {
         ArgumentNullException.ThrowIfNull(args);
